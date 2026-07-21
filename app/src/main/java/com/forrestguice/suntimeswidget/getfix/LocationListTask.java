@@ -1,0 +1,124 @@
+/**
+    Copyright (C) 2014-2018 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package com.forrestguice.suntimeswidget.getfix;
+
+import android.content.Context;
+import android.database.Cursor;
+import android.database.CursorIndexOutOfBoundsException;
+import android.util.Log;
+
+import com.forrestguice.annotation.Nullable;
+import com.forrestguice.suntimeswidget.R;
+import com.forrestguice.suntimeswidget.calculator.core.Location;
+
+import java.util.concurrent.Callable;
+
+public class LocationListTask implements Callable<LocationListTask.LocationListTaskResult>
+{
+    private final GetFixDatabaseAdapter db;
+    private final Location selected;
+
+    public LocationListTask(Context context, Location selected)
+    {
+        db = new GetFixDatabaseAdapter(context.getApplicationContext());
+        this.selected = selected;
+    }
+
+    @Nullable
+    @Override
+    public LocationListTaskResult call() throws Exception
+    {
+        String selectedPlaceName = selected.getLabel();
+        String selectedPlaceLat = selected.getLatitude();
+        String selectedPlaceLon = selected.getLongitude();
+        String selectedPlaceAlt = selected.getAltitude();
+
+        db.open();
+        Cursor cursor = db.getAllPlaces(0, true);
+        if (GetFixDatabaseAdapter.findPlaceByName(selectedPlaceName, cursor) == -1)
+        {
+            Log.i("LocationListTask", "Place not found, adding it.. " + selectedPlaceName + ":" + selectedPlaceLat + "," + selectedPlaceLon + " [" +  selectedPlaceAlt + "]");
+            boolean isCurrent = selectedPlaceName.equals(db.getContext().getString(R.string.location_lastfix_title_found))
+                    || selectedPlaceName.equals(db.getContext().getString(R.string.location_lastfix_title_cached))
+                    || selectedPlaceName.equals(db.getContext().getString(R.string.location_lastfix_title_set));
+            String comment = (isCurrent ? PlaceTags.TAG_GPS : "");
+
+            db.addPlace(selected, comment);
+            closeCursor(cursor);
+            cursor = db.getAllPlaces(0, true);
+        }
+
+        String selectedLat = selectedPlaceLat, selectedLon = selectedPlaceLon, selectedAlt = selectedPlaceAlt;
+        Cursor selectedCursor = db.getPlace(selectedPlaceName, true);
+        if (selectedCursor != null) {
+            try {
+                selectedLat = selectedCursor.getString(selectedCursor.getColumnIndexOrThrow(GetFixDatabaseAdapter.KEY_PLACE_LATITUDE));
+                selectedLon = selectedCursor.getString(selectedCursor.getColumnIndexOrThrow(GetFixDatabaseAdapter.KEY_PLACE_LONGITUDE));
+                selectedAlt = selectedCursor.getString(selectedCursor.getColumnIndexOrThrow(GetFixDatabaseAdapter.KEY_PLACE_ALTITUDE));
+            } catch (CursorIndexOutOfBoundsException | IllegalArgumentException e) {
+                Log.w("LocationListTask", "Place not found.. " + e);
+            } finally {
+                closeCursor(selectedCursor);
+            }
+        }
+
+        if (!selectedLat.equals(selectedPlaceLat) || !selectedLon.equals(selectedPlaceLon) || !selectedAlt.equals(selectedPlaceAlt))
+        {
+            Log.i("LocationListTask", "Place modified; saving it.. " + selectedPlaceName + ":" + selectedPlaceLat + "," + selectedPlaceLon + " [" +  selectedPlaceAlt + "]");
+            db.updatePlace(selected);
+            closeCursor(cursor);
+            cursor = db.getAllPlaces(0, true);
+        }
+
+        LocationListTaskResult result = null;
+        if (cursor != null)
+        {
+            int selectedIndex = GetFixDatabaseAdapter.findPlaceByName(selected.getLabel(), cursor);
+            if (selectedIndex < 0) {
+                Log.w("LocationListTask", "Place selection not found! " + selectedPlaceName + ":" + selectedPlaceLat + "," + selectedPlaceLon + " [" + selectedPlaceAlt + "]");
+            } // else Log.d("LocationListTask", "Place selection: " + selectedPlaceName + ":" + selectedPlaceLat + "," + selectedPlaceLon + " [" +  selectedPlaceAlt + "]");
+
+            result = new LocationListTaskResult(cursor, selectedIndex);
+        }
+        db.close();
+        return result;    // the caller has responsibility for eventually closing returned Cursor
+    }
+
+    private void closeCursor(@Nullable Cursor cursor) {
+        if (cursor != null) {
+             cursor.close();
+        }
+    }
+
+    public static class LocationListTaskResult
+    {
+        private final Cursor cursor;
+        public Cursor getCursor() { return cursor; }
+
+        private final int index;
+        public int getIndex() { return index; }
+
+        public LocationListTaskResult( Cursor cursor, int index )
+        {
+            this.cursor = cursor;
+            this.index = index;
+        }
+    }
+
+}

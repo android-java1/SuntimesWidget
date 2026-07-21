@@ -1,0 +1,563 @@
+/**
+    Copyright (C) 2023 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+*/ 
+
+package com.forrestguice.suntimeswidget.alarmclock.bedtime;
+
+import android.animation.ArgbEvaluator;
+import android.animation.ValueAnimator;
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
+import android.content.ContentUris;
+import android.content.Context;
+import android.content.Intent;
+import android.content.res.TypedArray;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+
+import android.text.SpannableStringBuilder;
+import android.text.style.ImageSpan;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.View;
+
+import com.forrestguice.annotation.NonNull;
+import com.forrestguice.annotation.Nullable;
+import com.forrestguice.suntimeswidget.HelpDialog;
+import com.forrestguice.suntimeswidget.R;
+import com.forrestguice.suntimeswidget.SuntimesSettingsActivity;
+import com.forrestguice.suntimeswidget.SuntimesUtils;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmClockItem;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmNotifications;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmTimeZone;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmType;
+import com.forrestguice.suntimeswidget.alarmclock.android.AndroidResID_AlarmTimeZone;
+import com.forrestguice.suntimeswidget.alarmclock.android.AndroidResID_AlarmType;
+import com.forrestguice.suntimeswidget.alarmclock.ui.AlarmClockActivity;
+import com.forrestguice.suntimeswidget.calculator.settings.display.AndroidResID_SolarEvents;
+import com.forrestguice.suntimeswidget.navigation.SuntimesNavigation;
+import com.forrestguice.suntimeswidget.settings.AppSettings;
+import com.forrestguice.suntimeswidget.settings.SettingsActivityInterface;
+import com.forrestguice.suntimeswidget.calculator.settings.SolarEvents;
+import com.forrestguice.suntimeswidget.settings.WidgetSettings;
+import com.forrestguice.suntimeswidget.views.SpanUtils;
+import com.forrestguice.support.app.ActivityResultLauncherCompat;
+import com.forrestguice.support.widget.PopupMenuCompat;
+import com.forrestguice.support.app.AppCompatActivity;
+import com.forrestguice.support.content.ContextCompat;
+import com.forrestguice.support.widget.Toolbar;
+import com.forrestguice.util.android.AndroidResources;
+import com.forrestguice.util.concurrent.SimpleProgressListener;
+
+import java.util.List;
+
+/**
+ * AlarmBedtimeActivity
+ */
+public class BedtimeActivity extends AppCompatActivity
+{
+    public static final String TAG = "BedtimeActivity";
+    public static final String TAG_FRAGMENT_BEDTIME = "BedtimeDialogFragment";
+
+    private static final String EXTRA_SHOWBACK = AlarmClockActivity.EXTRA_SHOWBACK;
+
+    private static final int REQUEST_SETTINGS = SuntimesNavigation.REQUEST_SETTINGS;
+    private final ActivityResultLauncherCompat startActivityForResult_settings = registerForActivityResultCompat(REQUEST_SETTINGS);
+
+    private static final String DIALOGTAG_HELP = "helpDialog";
+
+    protected Toolbar menubar;
+    @Nullable
+    private BedtimeDialog list;
+    private AppSettings.LocaleInfo localeInfo;
+    private SuntimesNavigation navigation;
+
+    protected int actionBar_background0, actionBar_background1;
+
+    public BedtimeActivity() {
+        super();
+    }
+
+    @Override
+    protected void attachBaseContext(Context newBase)
+    {
+        Context context = AppSettings.initLocale(newBase, localeInfo = new AppSettings.LocaleInfo());
+        super.attachBaseContext(context);
+    }
+
+    @Override
+    public void onCreate(Bundle savedState)
+    {
+        initTheme();
+        super.onCreate(savedState);
+        initLocale(this);
+        setContentView(R.layout.layout_activity_bedtime);
+        initViews(this);
+        initWarnings(this, savedState);
+        handleIntent(getIntent());
+    }
+
+    @Override
+    public void onStart()
+    {
+        super.onStart();
+        registerReceiver(generalUpdateBroadcastReceiver, AlarmNotifications.getUpdateBroadcastIntentFilter(false));
+        registerReceiver(itemUpdateBroadcastReceiver, AlarmNotifications.getUpdateBroadcastIntentFilter());
+    }
+
+    @Override
+    public void onResume()
+    {
+        super.onResume();
+        restoreDialogs();
+        checkWarnings();
+    }
+
+    @Override
+    public void onPause()
+    {
+        super.onPause();
+    }
+
+    @Override
+    public void onStop()
+    {
+        unregisterReceiver(generalUpdateBroadcastReceiver);
+        unregisterReceiver(itemUpdateBroadcastReceiver);
+        super.onStop();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+    }
+
+    @Override
+    public void onActivityResultCompat(int requestCode, int resultCode, Intent data)
+    {
+        super.onActivityResultCompat(requestCode, resultCode, data);
+        switch (requestCode)
+        {
+            case REQUEST_SETTINGS:
+                onSettingsResult(resultCode, data);
+                break;
+        }
+    }
+
+    protected void initWarnings(Context context, Bundle savedState) {
+        // TODO
+    }
+    protected void checkWarnings() {
+        // TODO
+    }
+    protected void saveWarnings(Bundle outState) {
+        // TODO
+    }
+    protected void restoreWarnings(@NonNull Bundle savedState) {
+        // TODO
+    }
+
+    private String appTheme;
+    private int appThemeResID;
+
+    private void initTheme()
+    {
+        appTheme = AppSettings.loadThemePref(this);
+        appThemeResID = AppSettings.setTheme(this, appTheme);
+    }
+
+    private final BroadcastReceiver itemUpdateBroadcastReceiver = new BroadcastReceiver()
+    {
+        @Override
+        public void onReceive(Context context, Intent intent)
+        {
+            String action = intent.getAction();
+            Uri data = intent.getData();
+            Log.d(TAG, "updateReceiver.onReceive: " + data + " :: " + action);
+
+            if (action != null)
+            {
+                if (data != null) {
+                    if (action.equals(AlarmNotifications.ACTION_UPDATE_UI)) {
+                        boolean alarmDeleted = intent.getBooleanExtra(AlarmNotifications.ACTION_DELETE, false);
+                        onAlarmItemUpdated(ContentUris.parseId(data), alarmDeleted);
+
+                    } else Log.e(TAG, "updateReceiver.onReceive: unrecognized action: " + action);
+                } else Log.e(TAG, "updateReceiver.onReceive: null data!");
+            } else Log.e(TAG, "updateReceiver.onReceive: null action!");
+        }
+    };
+
+    private final BroadcastReceiver generalUpdateBroadcastReceiver = new BroadcastReceiver()
+    {
+        @Override
+        public void onReceive(Context context, Intent intent)
+        {
+            String action = intent.getAction();
+            Uri data = intent.getData();
+            Log.d(TAG, "updateReceiver.onReceive: " + data + " :: " + action);
+
+            if (action != null)
+            {
+                if (action.equals(AlarmNotifications.ACTION_UPDATE_UI))
+                {
+                    boolean alarmsCleared = intent.getBooleanExtra(AlarmNotifications.ACTION_DELETE, false);
+                    onAlarmItemUpdated(null, alarmsCleared);
+
+                } else Log.e(TAG, "updateReceiver.onReceive: unrecognized action: " + action);
+            } else Log.e(TAG, "updateReceiver.onReceive: null action!");
+        }
+    };
+
+    protected void onAlarmItemUpdated(@Nullable Long alarmID, boolean deleted)
+    {
+        BedtimeItemAdapter adapter = (list != null ? list.getAdapter() : null);
+        if (adapter != null)
+        {
+            if (alarmID != null)
+            {
+                Integer[] positions = adapter.findItemPositions(BedtimeActivity.this, alarmID);
+                for (final int position : positions)
+                {
+                    BedtimeItem item = (position >= 0 ? adapter.getItem(position) : null);
+                    if (item != null)
+                    {
+                        //Log.d("DEBUG", "onAlarmItemUpdated: " + alarmID + ", deleted? " + deleted + ", position " + position);
+                        if (deleted) {
+                            item.setAlarmItem(null);
+                            list.notifyItemChanged(position);
+                            continue;
+                        }
+                        item.loadAlarmItem(this, new SimpleProgressListener<AlarmClockItem, List<AlarmClockItem>>()
+                        {
+                            @Override
+                            public void onFinished(List<AlarmClockItem> result) {
+                                list.notifyItemChanged(position);
+                            }
+                        });
+                    }
+                }
+
+            } else {
+                list.notifyItemChanged(0);
+            }
+        } else {
+            if (list != null) {
+                list.reloadAdapter();
+            }
+        }
+    }
+
+    @Override
+    public void onNewIntent( Intent intent )
+    {
+        super.onNewIntent(intent);
+        Log.d("DEBUG", "new intent: " + intent);
+        handleIntent(intent);
+    }
+
+    protected void handleIntent(Intent intent)
+    {
+        String param_action = intent.getAction();
+        intent.setAction(null);
+
+        Uri param_data = intent.getData();
+        intent.setData(null);
+
+        /*if (param_action != null)
+        {
+            if (param_action.equals(AlarmNotifications.ACTION_BEDTIME)) {
+                handleIntent_bedtime(this, intent);
+
+            } else if (param_action.equalsIgnoreCase(AlarmNotifications.ACTION_BEDTIME_DISMISS)) {
+                handleIntent_bedtimeDismiss(this, intent);
+            }
+
+        } else {
+            if (param_data != null) {
+                // TODO
+                //list.notifyAlarmUpdated(ContentUris.parseId(param_data));
+            }
+        }*/
+    }
+
+    /*protected void handleIntent_bedtime(Context context, Intent intent)
+    {
+        Toast.makeText(context, "bedtime trigger received", Toast.LENGTH_SHORT).show();
+        AlarmNotifications.NotificationService.triggerBedtimeMode(context, true);
+    }
+    protected void handleIntent_bedtimeDismiss(Context context, Intent intent)
+    {
+        Toast.makeText(context, "bedtime dismiss received", Toast.LENGTH_SHORT).show();
+        AlarmNotifications.NotificationService.triggerBedtimeMode(context, false);
+    }*/
+
+    @SuppressLint("ResourceType")
+    private void initLocale(Context context)
+    {
+        AndroidResources res = AndroidResources.wrap(context);
+        WidgetSettings.initDefaults(context);
+        WidgetSettings.initDisplayStrings(context);
+        SuntimesUtils.initDisplayStrings(context);
+        SolarEvents.initDisplayStrings(res, new AndroidResID_SolarEvents());
+        AlarmType.initDisplayStrings(res, AndroidResID_AlarmType.get());
+        AlarmTimeZone.initDisplayStrings(res, AndroidResID_AlarmTimeZone.get());
+
+        // TODO
+        /*int[] attrs = { R.attr.alarmColorEnabled, android.R.attr.textColorPrimary, R.attr.text_disabledColor, R.attr.buttonPressColor, android.R.attr.textColor, R.attr.icActionNew, R.attr.icActionClose };
+        TypedArray a = context.obtainStyledAttributes(attrs);
+        colorAlarmEnabled = colorOn = ContextCompat.getColor(context, a.getResourceId(0, R.color.alarm_enabled_dark));
+        a.recycle();*/
+    }
+
+    @Override
+    public void onSaveInstanceState( @NonNull Bundle outState )
+    {
+        super.onSaveInstanceState(outState);
+        saveWarnings(outState);
+    }
+
+    @Override
+    public void onRestoreInstanceState(@NonNull Bundle savedState)
+    {
+        super.onRestoreInstanceState(savedState);
+        restoreWarnings(savedState);
+    }
+
+    /**
+     * initialize ui/views
+     * @param context a context used to access resources
+     */
+    protected void initViews(Context context)
+    {
+        SuntimesUtils.initDisplayStrings(context);
+
+        menubar = (Toolbar) findViewById(R.id.app_menubar);
+        setSupportActionBar(menubar);
+        if (getSupportActionBar() != null)
+        {
+            getSupportActionBar().setHomeButtonEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            boolean showBack = getIntent().getBooleanExtra(EXTRA_SHOWBACK, false);
+            if (!showBack) {
+                getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_action_suntimes);   // TODO: "suntimes alarms" icon
+            }
+        }
+
+        navigation = new SuntimesNavigation(this, menubar, R.id.action_bedtime);
+
+        TypedArray a = obtainStyledAttributes(new int[] { R.attr.dialogBackground, R.attr.dialogBackgroundAlt });
+        actionBar_background0 = ContextCompat.getColor(this, a.getResourceId(0, R.color.dialog_bg));
+        actionBar_background1 = ContextCompat.getColor(this, a.getResourceId(1, R.color.dialog_bg_alt));
+        a.recycle();
+
+        int menubarColor = BedtimeSettings.isBedtimeModeActive(getApplicationContext()) ? actionBar_background0 : actionBar_background1;
+        menubar.setBackgroundColor(menubarColor);
+
+        list = (BedtimeDialog) getSupportFragmentManager().findFragmentByTag(TAG_FRAGMENT_BEDTIME);
+        if (list == null) {
+            list = BedtimeDialog.newInstance();
+        }
+        list.setDialogListener(dialogListener(menubarColor));
+
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragmentContainer, list, TAG_FRAGMENT_BEDTIME)
+                .setReorderingAllowed(true)
+                .commit();
+    }
+
+    private BedtimeDialog.DialogListener dialogListener(final int initialColor)
+    {
+        return new BedtimeDialog.DialogListener()
+        {
+            private int backgroundColor = initialColor;
+
+            @Override
+            public void onScrolled(int lastCompletelyVisibleItemPosition)
+            {
+                if (menubar != null)
+                {
+                    int from = backgroundColor;
+                    backgroundColor = ((lastCompletelyVisibleItemPosition == 0) ? actionBar_background0 : actionBar_background1);
+                    if (from != backgroundColor)
+                    {
+                        ValueAnimator animation = ValueAnimator.ofObject(new ArgbEvaluator(), from, backgroundColor);
+                        animation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                            @Override
+                            public void onAnimationUpdate(ValueAnimator animator) {
+                                menubar.setBackgroundColor((Integer) animator.getAnimatedValue());
+                            }
+                        });
+
+                        animation.setDuration(getResources().getInteger(R.integer.anim_fadein_duration));
+                        animation.setStartDelay(0);
+                        animation.start();
+                    }
+                }
+            }
+
+            @Override
+            public void onItemClick(BedtimeViewHolder holder, BedtimeItem item) {
+            }
+
+            @Override
+            public void onItemAction(BedtimeViewHolder holder, BedtimeItem item) {
+            }
+
+            @Override
+            public void onItemConfigure(BedtimeViewHolder holder, BedtimeItem item) {
+            }
+        };
+    }
+
+    protected void updateViews(Context context) {
+    }
+
+    protected void restoreDialogs()
+    {
+        /*FragmentManager fragments = getSupportFragmentManager();
+        AlarmCreateDialog alarmCreateDialog = (AlarmCreateDialog) fragments.findFragmentById(R.id.createAlarmFragment);
+        if (alarmCreateDialog != null) {
+            alarmCreateDialog.setOnAcceptedListener(onAddAlarmAccepted);
+            alarmCreateDialog.setOnCanceledListener(onAddAlarmCanceled);
+            alarmCreateDialog.setOnNeutralListener(onAddAlarmNeutral);
+        }*/
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu)
+    {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.bedtime, menu);
+        SuntimesNavigation.updateMenuNavigationItems(this, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item)
+    {
+        int itemId = item.getItemId();
+        if (itemId == R.id.action_permission) {
+            BedtimeSettings.startDoNotDisturbAccessActivity(BedtimeActivity.this);
+            //AlarmNotifications.NotificationService.triggerBedtimeMode(this, true);
+            return true;
+
+        } else if (itemId == R.id.action_settings) {
+            showSettings();
+            return true;
+
+        } else if (itemId == R.id.action_help) {
+            showHelp(this);
+            return true;
+
+        } else if (itemId == R.id.action_about) {
+            navigation.showAbout(this);
+            return true;
+
+        } else if (itemId == android.R.id.home) {
+            if (getIntent().getBooleanExtra(EXTRA_SHOWBACK, false))
+                onBackPressed();
+            else onHomePressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onBackPressed()
+    {
+        if (navigation != null && navigation.isNavigationDrawerOpen()) {
+            navigation.closeNavigationDrawer();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    protected void onHomePressed()
+    {
+        Intent intent = new Intent(this, AlarmClockActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent);
+        overridePendingTransition(R.anim.transition_swap_in, R.anim.transition_swap_out);
+    }
+
+    @Override
+    public boolean onPreparePanel(int featureId, View view, @NonNull Menu menu)
+    {
+        PopupMenuCompat.forceActionBarIcons(menu);
+        return super.onPreparePanel(featureId, view, menu);
+    }
+
+    protected void showSettings()
+    {
+        Intent settingsIntent = new Intent(this, SuntimesSettingsActivity.class);
+        startActivityForResult_settings.launch(settingsIntent);
+        overridePendingTransition(R.anim.transition_next_in, R.anim.transition_next_out);
+    }
+
+    @SuppressLint("ResourceType")
+    protected void showHelp(Context context)
+    {
+        int iconSize = (int) context.getResources().getDimension(R.dimen.helpIcon_size);
+        int[] iconAttrs = { R.attr.icActionBedtime, R.attr.icActionNotification1, R.attr.icActionAlarm };
+        TypedArray typedArray = context.obtainStyledAttributes(iconAttrs);
+        ImageSpan bedtimeIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(0, R.drawable.ic_action_bedtime), iconSize, iconSize, 0, null);
+        ImageSpan reminderIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(1, R.drawable.ic_action_notification1), iconSize, iconSize, 0, null);
+        ImageSpan alarmIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(2, R.drawable.ic_action_alarms), iconSize, iconSize, 0, null);
+        typedArray.recycle();
+
+        SpanUtils.ImageSpanTag[] helpTags = {
+                new SpanUtils.ImageSpanTag("[Icon Bedtime]", bedtimeIcon),
+                new SpanUtils.ImageSpanTag("[Icon Reminder]", reminderIcon),
+                new SpanUtils.ImageSpanTag("[Icon Alarm]", alarmIcon),
+        };
+
+        CharSequence helpString = SpanUtils.fromHtml(context.getString(R.string.help_alarms_bedtime));
+        SpannableStringBuilder helpSpan = SpanUtils.createSpan(context, helpString, helpTags);
+
+        HelpDialog helpDialog = new HelpDialog();
+        helpDialog.setContent(helpSpan);
+        helpDialog.show(getSupportFragmentManager(), DIALOGTAG_HELP);
+    }
+
+    protected void onSettingsResult(int resultCode, Intent data)
+    {
+        boolean recreateActivity = (data != null && data.getBooleanExtra(SettingsActivityInterface.RECREATE_ACTIVITY, false));
+        if (recreateActivity) {
+            Handler handler = new Handler();
+            handler.postDelayed(recreateRunnable, 0);    // post to end of execution queue (onResume must be allowed to finish before calling recreate)
+        }
+    }
+    private final Runnable recreateRunnable = new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            if (Build.VERSION.SDK_INT >= 11) {
+                recreate();
+            }  // TODO: legacy support
+        }
+    };
+
+}

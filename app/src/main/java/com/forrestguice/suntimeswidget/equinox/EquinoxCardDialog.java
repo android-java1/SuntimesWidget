@@ -1,0 +1,949 @@
+/**
+    Copyright (C) 2022-2024 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package com.forrestguice.suntimeswidget.equinox;
+
+import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.res.Configuration;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+
+import android.util.Log;
+import android.view.ContextThemeWrapper;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.SubMenu;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.TextView;
+
+import com.forrestguice.annotation.NonNull;
+import com.forrestguice.annotation.Nullable;
+import com.forrestguice.colors.ColorValues;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmSettings;
+import com.forrestguice.suntimeswidget.calculator.core.SuntimesCalculator;
+import com.forrestguice.suntimeswidget.calculator.settings.SolsticeEquinoxMode;
+import com.forrestguice.suntimeswidget.calculator.settings.TrackingMode;
+import com.forrestguice.suntimeswidget.calculator.settings.display.TimeDateDisplay;
+import com.forrestguice.suntimeswidget.calculator.settings.display.TimeDeltaDisplay;
+import com.forrestguice.suntimeswidget.colors.AppColorValues;
+import com.forrestguice.suntimeswidget.colors.AppColorValuesCollection;
+import com.forrestguice.suntimeswidget.colors.ColorValuesSheetDialog;
+import com.forrestguice.suntimeswidget.views.SpanUtils;
+import com.forrestguice.suntimeswidget.views.Toast;
+import com.forrestguice.suntimeswidget.HelpDialog;
+import com.forrestguice.suntimeswidget.MenuAddon;
+import com.forrestguice.suntimeswidget.R;
+import com.forrestguice.suntimeswidget.SuntimesActivity;
+import com.forrestguice.suntimeswidget.SuntimesUtils;
+import com.forrestguice.suntimeswidget.calculator.SuntimesEquinoxSolsticeData;
+import com.forrestguice.suntimeswidget.calculator.SuntimesEquinoxSolsticeDataset;
+import com.forrestguice.suntimeswidget.cards.CardAdapter;
+import com.forrestguice.suntimeswidget.settings.AppSettings;
+import com.forrestguice.suntimeswidget.settings.WidgetSettings;
+import com.forrestguice.suntimeswidget.themes.SuntimesTheme;
+import com.forrestguice.suntimeswidget.views.TooltipCompat;
+import com.forrestguice.suntimeswidget.views.ViewUtils;
+import com.forrestguice.support.widget.BottomSheetDialogBase;
+import com.forrestguice.support.widget.GridLayoutManager;
+import com.forrestguice.support.widget.ImageViewCompat;
+import com.forrestguice.support.widget.LinearLayoutManager;
+import com.forrestguice.support.widget.PagerSnapHelper;
+import com.forrestguice.support.widget.PopupMenuCompat;
+import com.forrestguice.support.widget.RecyclerView;
+import com.forrestguice.util.android.AndroidResources;
+
+import java.util.Calendar;
+import java.util.List;
+
+public class EquinoxCardDialog extends BottomSheetDialogBase
+{
+    public static final String DIALOGTAG_COLORS= "equinox_colors";
+
+    public static final String DIALOGTAG_HELP = "equinox_help";
+    public static final int HELP_PATH_ID = R.string.help_solstice_path;
+
+    protected static final TimeDateDisplay utils = new TimeDateDisplay();
+    protected static final TimeDeltaDisplay delta_utils = new TimeDeltaDisplay();
+
+    protected TextView empty, text_title;
+    protected TextView text_year_length, text_year_length_label;
+    protected ImageButton btn_next, btn_prev, btn_menu;
+
+    protected EquinoxViewOptions options = new EquinoxViewOptions();
+
+    protected void setUserSwappedCard(boolean value) {
+        getArgs().putBoolean("userSwappedCard", value);
+    }
+    public boolean userSwappedCard() {
+        return getArgs().getBoolean("userSwappedCard", false);
+    }
+
+    public EquinoxCardDialog() {
+        setArguments(new Bundle());
+    }
+
+    @NonNull
+    @Override
+    public Dialog onCreateDialog(Bundle savedInstanceState)
+    {
+        Dialog dialog = super.onCreateDialog(savedInstanceState);
+        dialog.setOnShowListener(onShowListener);
+        return dialog;
+    }
+
+    @Override
+    public boolean onBackPressed() {
+        if (hasSelection())
+        {
+            setSelection((Integer) null);
+            if (AppSettings.isTelevision(getContext())) {
+                btn_menu.requestFocus();
+            }
+            return true;
+        } else return false;
+    }
+
+    public void initLocale(Context context)
+    {
+        SuntimesUtils.initDisplayStrings(context);
+        options.isRtl = AppSettings.isLocaleRtl(context);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup parent, @Nullable Bundle savedState)
+    {
+        ContextThemeWrapper context = new ContextThemeWrapper(requireContext(), AppSettings.loadTheme(requireContext()));    // hack: contextWrapper required because base theme is not properly applied
+        View v = inflater.cloneInContext(context).inflate(R.layout.layout_dialog_equinox1, parent, false);
+        initLocale(context);
+
+        options.init(context);
+        options.showSeconds = true;
+        options.showDate = true;
+
+        AppColorValuesCollection<AppColorValues> colors = new AppColorValuesCollection<>();
+        boolean isNightMode = context.getResources().getBoolean(R.bool.is_nightmode);
+        ColorValues values = colors.getSelectedColors(context, (isNightMode ? 1 : 0), AppColorValues.TAG_APPCOLORS);
+        if (values != null) {
+            options.colors = new EquinoxColorValues(values);
+        }
+
+        empty = (TextView)v.findViewById(R.id.txt_empty);
+        text_title = (TextView)v.findViewById(R.id.text_title1);
+        btn_next = (ImageButton)v.findViewById(R.id.info_time_nextbtn1);
+        btn_prev = (ImageButton)v.findViewById(R.id.info_time_prevbtn1);
+        btn_menu = (ImageButton)v.findViewById(R.id.menu_button);
+        text_year_length = (TextView)v.findViewById(R.id.info_time_year_length);
+        text_year_length_label = (TextView)v.findViewById(R.id.info_time_year_length_label);
+
+        if (text_title != null) {
+            text_title.setOnClickListener(onTitleClicked);
+        }
+        if (btn_next != null) {
+            TooltipCompat.setTooltipText(btn_next, btn_next.getContentDescription());
+            btn_next.setOnClickListener(onNextClicked);
+        }
+        if (btn_prev != null) {
+            TooltipCompat.setTooltipText(btn_prev, btn_prev.getContentDescription());
+            btn_prev.setOnClickListener(onPrevClicked);
+        }
+        if (btn_menu != null)
+        {
+            TooltipCompat.setTooltipText(btn_menu, btn_menu.getContentDescription());
+            btn_menu.setOnClickListener(onMenuClicked);
+            if (AppSettings.isTelevision(getContext())) {
+                btn_menu.setFocusableInTouchMode(true);
+            }
+        }
+
+        initCardView(context, v);
+
+        options.trackingMode = WidgetSettings.loadTrackingModePref(context, 0);
+        if (savedState != null) {
+            loadState(savedState);
+        }
+
+        themeViews(context);
+        updateViews(context, card_adapter.initData(context, EquinoxDataAdapter.CENTER_POSITION));
+        return v;
+    }
+
+    @Override
+    public void onResume()
+    {
+        super.onResume();
+        expandSheet(getDialog());
+
+        ColorValuesSheetDialog colorDialog = (ColorValuesSheetDialog) getChildFragmentManager().findFragmentByTag(DIALOGTAG_COLORS);
+        if (colorDialog != null)
+        {
+            boolean isNightMode = getResources().getBoolean(R.bool.is_nightmode);
+            colorDialog.setAppWidgetID((isNightMode ? 1 : 0));
+            colorDialog.setColorTag(AppColorValues.TAG_APPCOLORS);
+            colorDialog.setColorCollection(new AppColorValuesCollection<>(requireContext()));
+            colorDialog.setDialogListener(colorDialogListener);
+        }
+
+        HelpDialog helpDialog = (HelpDialog) getChildFragmentManager().findFragmentByTag(DIALOGTAG_HELP);
+        if (helpDialog != null) {
+            helpDialog.setNeutralButtonListener(HelpDialog.getOnlineHelpClickListener(requireContext(), HELP_PATH_ID), DIALOGTAG_HELP);
+        }
+    }
+
+    @Override
+    protected int getPeekViewId() {
+        return R.id.info_equinoxsolstice_flipper1;
+    }
+
+    private final DialogInterface.OnShowListener onShowListener = new DialogInterface.OnShowListener()
+    {
+        @Override
+        public void onShow(DialogInterface dialogInterface)
+        {
+            Context context = getContext();
+            if (context != null)
+            {
+                updateViews(context);
+                text_title.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        BottomSheetDialogBase.initPeekHeight(getDialog(), R.id.info_equinoxsolstice_flipper1);
+                    }
+                });
+
+                if (AppSettings.isTelevision(context)) {
+                    btn_menu.requestFocus();
+                }
+
+            } else Log.w("EquinoxDialog.onShow", "null context! skipping update");
+        }
+    };
+
+    private final View.OnClickListener onTitleClicked = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            onTitleClicked(currentCardPosition());
+        }
+    };
+    protected void onTitleClicked(int position)
+    {
+        if (currentCardPosition() >= 0)
+        {
+            int seekPosition = EquinoxDataAdapter.CENTER_POSITION;
+            if (Math.abs(position - seekPosition) > SuntimesActivity.HIGHLIGHT_SCROLLING_ITEMS) {
+                card_view.scrollToPosition(seekPosition);
+            } else if (getContext() != null) {
+                CardAdapter.CardViewScroller card_scroller = new CardAdapter.CardViewScroller(getContext());
+                card_scroller.setTargetPosition(seekPosition);
+                card_layout.startSmoothScroll(card_scroller);
+            }
+        }
+    }
+
+    private final View.OnClickListener onNextClicked = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            onNextClicked(currentCardPosition());
+        }
+    };
+    protected void onNextClicked(int position) {
+        if (position >= 0 && getContext() != null) {
+            setUserSwappedCard(showNextCard(getContext(), position));
+        }
+    }
+
+    private final View.OnClickListener onPrevClicked = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            onPrevClicked(currentCardPosition());
+        }
+    };
+    protected void onPrevClicked(int position) {
+        if (position >= 0 && getContext() != null) {
+            setUserSwappedCard(showPreviousCard(getContext(), position));
+        }
+    }
+
+    private final View.OnClickListener onMenuClicked = new ViewUtils.ThrottledClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (getContext() != null) {
+                showOverflowMenu(getContext(), v);
+            }
+        }
+    });
+
+    private void themeViews(Context context)
+    {
+        if (themeOverride != null)
+        {
+            //noinspection deprecation
+            options.init(themeOverride);
+            //noinspection deprecation
+            card_adapter.setThemeOverride(themeOverride);
+
+            text_title.setTextColor(options.titleColor);
+            if (options.titleSizeSp != null)
+            {
+                text_title.setTextSize(options.titleSizeSp);
+                text_title.setTypeface(text_title.getTypeface(), (options.titleBold ? Typeface.BOLD : Typeface.NORMAL));
+            }
+
+            ImageViewCompat.setImageTintList(btn_next, SuntimesUtils.colorStateList(options.titleColor, options.disabledColor, options.pressedColor));
+            ImageViewCompat.setImageTintList(btn_prev, SuntimesUtils.colorStateList(options.titleColor, options.disabledColor, options.pressedColor));
+
+            if (options.textColor != null) {
+                text_year_length.setTextColor(options.textColor);
+            }
+            if (options.timeSizeSp != null) {
+                text_year_length.setTextSize(options.timeSizeSp);
+            }
+        }
+    }
+
+    private SuntimesTheme themeOverride = null;
+    @Deprecated
+    public void themeViews(Context context, SuntimesTheme theme)
+    {
+        if (theme != null)
+        {
+            themeOverride = theme;
+            if (isAdded()) {
+                themeViews(context);
+            }
+        }
+    }
+
+    public void updateViews(Context context)
+    {
+        showEmptyView(!isImplemented(card_adapter.initData(context, EquinoxDatasetAdapter.CENTER_POSITION)));
+        int position = card_adapter.highlightNote(context);
+        if (position != -1 && !userSwappedCard()) {
+            card_view.suppressLayout(false);
+            card_view.scrollToPosition(position);
+            card_view.suppressLayout(false);         // TODO: was this a typo? why are calling setLayoutFrozen(false) twice...
+        }
+        if (text_year_length_label != null && options.columnWidthPx != -1)
+        {
+            ViewGroup.LayoutParams layoutParams = text_year_length_label.getLayoutParams();
+            layoutParams.width = options.columnWidthPx;
+            text_year_length_label.setLayoutParams(layoutParams);
+        }
+        //Log.d("DEBUG", "EquinoxDialog updated");
+    }
+
+    protected boolean isImplemented(@Nullable SuntimesEquinoxSolsticeDataset data) {
+        return (data != null && data.isImplemented());
+    }
+    protected void updateViews(@NonNull Context context,  SuntimesEquinoxSolsticeDataset data) {
+        updateViews(context, data.dataEquinoxSpring);
+    }
+
+    protected boolean isImplemented(@Nullable SuntimesEquinoxSolsticeData data) {
+        return (data != null && data.isImplemented());
+    }
+    protected void updateViews(@NonNull Context context, SuntimesEquinoxSolsticeData data)
+    {
+        Calendar calendar = data.eventCalendarThisYear();
+        CharSequence titleDisplay = (calendar != null ? utils.calendarDateYearDisplayString(AndroidResources.wrap(context), calendar).toString() : "");
+        text_title.setText(titleDisplay);
+
+        SuntimesCalculator calculator = data.calculator();
+        CharSequence yearDisplay = (calculator != null ? styleYearDisplayText(context, calculator.getTropicalYearLength(data.calendar())) : "");
+        text_year_length.setText(yearDisplay);
+    }
+
+    protected CharSequence styleYearDisplayText(@NonNull Context context, long yearLengthMillis)
+    {
+        double yearLengthDays = yearLengthMillis / 1000d / 60d / 60d / 24;
+        String timeString = delta_utils.timeDeltaLongDisplayString(0, yearLengthMillis, false,false, true, true, false, false).setSuffix("").toString();
+        String daysString = context.getResources().getQuantityString(R.plurals.time_units_days, (int)yearLengthDays, TimeDeltaDisplay.formatDoubleValue(yearLengthDays, 6));
+        String yearString = context.getString(R.string.length_tropical_year, timeString, daysString);
+        return SpanUtils.createBoldColorSpan(null, yearString, timeString, options.noteColor);
+    }
+    
+    @Override
+    public void onSaveInstanceState( Bundle outState )
+    {
+        outState.putInt("currentCardPosition", currentCardPosition());
+        super.onSaveInstanceState(outState);
+    }
+
+    public void loadState(Bundle bundle)
+    {
+        int cardPosition = bundle.getInt("currentCardPosition", EquinoxDatasetAdapter.CENTER_POSITION);
+        if (cardPosition == RecyclerView.NO_POSITION) {
+            cardPosition = EquinoxDatasetAdapter.CENTER_POSITION;
+        }
+        card_view.scrollToPosition(cardPosition);
+        card_view.smoothScrollBy(1, 0);  // triggers a snap
+    }
+
+    protected void showHelp(Context context)
+    {
+        String topic1 = context.getString(R.string.help_general_timeMode2);
+        String topic2 = context.getString(R.string.help_general_timeMode2_1);
+        String topic3 = context.getString(R.string.help_general_tropicalyear);
+        String helpContent = context.getString(R.string.help_general3, topic1, topic2, topic3);
+
+        HelpDialog helpDialog = new HelpDialog();
+        helpDialog.setContent(helpContent);
+        helpDialog.setShowNeutralButton(getString(R.string.action_onlineHelp));
+        helpDialog.setNeutralButtonListener(HelpDialog.getOnlineHelpClickListener(context, HELP_PATH_ID), DIALOGTAG_HELP);
+        helpDialog.show(getChildFragmentManager(), DIALOGTAG_HELP);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    protected boolean showOverflowMenu(final Context context, View view)
+    {
+        PopupMenuCompat.createMenu(context, view, R.menu.equinoxmenu, onOverflowMenuClick).show();
+        return true;
+    }
+
+    private void updateOverflowMenu(Context context, Menu menu)
+    {
+        MenuItem trackingItem = menu.findItem(R.id.action_tracking_mode);
+        if (trackingItem != null) {
+            stripMenuItemLabel(trackingItem);
+            updateTrackingMenu(trackingItem.getSubMenu(), WidgetSettings.loadTrackingModePref(context, 0));
+        }
+
+        MenuItem crossQuarterItem = menu.findItem(R.id.action_crossquarterdays);
+        crossQuarterItem.setChecked(AppSettings.loadShowCrossQuarterPref(context));
+    }
+
+    private static void stripMenuItemLabel(MenuItem item) {
+        String title = item.getTitle().toString();
+        if (title.endsWith(":")) {
+            item.setTitle(title.substring(0, title.length()-1));
+        }
+    }
+
+    private void updateTrackingMenu(SubMenu trackingMenu, TrackingMode trackingMode)
+    {
+        if (trackingMenu != null)
+        {
+            MenuItem selectedItem;
+            switch (trackingMode) {
+                case RECENT: selectedItem = trackingMenu.findItem(R.id.trackRecent); break;
+                case CLOSEST: selectedItem = trackingMenu.findItem(R.id.trackClosest); break;
+                case SOONEST: default: selectedItem = trackingMenu.findItem(R.id.trackUpcoming); break;
+            }
+            if (selectedItem != null) {
+                selectedItem.setChecked(true);
+            }
+        }
+    }
+
+    private void onTrackingModeChanged(Context context, int id)
+    {
+        TrackingMode mode = null;
+        if (id == R.id.trackRecent) {
+            mode = TrackingMode.RECENT;
+        } else if (id == R.id.trackClosest) {
+            mode = TrackingMode.CLOSEST;
+        } else if (id == R.id.trackUpcoming) {
+            mode = TrackingMode.SOONEST;
+        }
+        if (mode != null) {
+            WidgetSettings.saveTrackingModePref(context, 0, mode);
+            updateViews(context);
+            if (dialogListener != null) {
+                dialogListener.onOptionsModified(true);
+            }
+        } else Log.w("EquinoxDialog", "setTrackingMode: invalid item id " + id);
+    }
+
+    private void onToggleCrossQuarterDays(Context context, MenuItem item)
+    {
+        AppSettings.saveShowCrossQuarterPref(context, !item.isChecked());
+        initAdapter(context);
+        updateViews(context);
+        if (dialogListener != null) {
+            dialogListener.onOptionsModified(false);
+        }
+        card_view.post(new Runnable() {
+            @Override
+            public void run() {
+                initSheet(getDialog());    // re-init dialog peek height
+            }
+        });
+    }
+
+    private final PopupMenuCompat.PopupMenuListener onOverflowMenuClick = new ViewUtils.ThrottledPopupMenuListener(new PopupMenuCompat.PopupMenuListener()
+    {
+        @Override
+        public void onUpdateMenu(Context context, Menu menu) {
+            updateOverflowMenu(context, menu);
+        }
+
+        @Override
+        public boolean onMenuItemClick(MenuItem item)
+        {
+            Context context = getContext();
+            if (context == null) {
+                return false;
+            }
+
+            int itemId = item.getItemId();
+            if (itemId == R.id.action_colors) {
+                showColorDialog(context);
+                return true;
+
+            } else if (itemId == R.id.trackRecent || itemId == R.id.trackClosest || itemId == R.id.trackUpcoming) {
+                onTrackingModeChanged(context, item.getItemId());
+                return true;
+
+            } else if (itemId == R.id.action_crossquarterdays) {
+                onToggleCrossQuarterDays(context, item);
+                return true;
+
+            } else if (itemId == R.id.action_help) {
+                showHelp(context);
+                return true;
+            }
+            return false;
+        }
+    });
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public void showColorDialog(Context context)
+    {
+        boolean isNightMode = context.getResources().getBoolean(R.bool.is_nightmode);
+        ColorValuesSheetDialog dialog = new ColorValuesSheetDialog();
+        dialog.setAppWidgetID((isNightMode ? 1 : 0));
+        dialog.setColorTag(AppColorValues.TAG_APPCOLORS);
+        dialog.setColorCollection(new AppColorValuesCollection<>(context));
+        dialog.setDialogListener(colorDialogListener);
+        dialog.setFilter(new EquinoxColorValues().getColorKeys());
+        dialog.show(getChildFragmentManager(), DIALOGTAG_COLORS);
+    }
+
+    private final ColorValuesSheetDialog.DialogListener colorDialogListener = new ColorValuesSheetDialog.DialogListener()
+    {
+        @Override
+        public void onColorValuesSelected(@Nullable ColorValues values)
+        {
+            if (values != null) {
+                options.colors = new EquinoxColorValues(values);
+            } else if (getContext() != null) {
+                options.init(getContext());
+            }
+            card_adapter.notifyDataSetChanged();
+
+            if (dialogListener != null) {
+                dialogListener.onColorsModified(values);
+            }
+        }
+
+        public void requestPeekHeight(int height) {}
+        public void requestHideSheet() {}
+        public void requestExpandSheet() {}
+        public void onModeChanged(int mode) {}
+
+        @SuppressWarnings("ConstantConditions")
+        @Nullable
+        @Override
+        public ColorValues getDefaultValues() {
+            return (getContext() != null ? new AppColorValues(AndroidResources.wrap(getContext()), true) : null);
+        }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    protected boolean showContextMenu(final Context context, View view, final SolsticeEquinoxMode mode, final long datetime)
+    {
+        PopupMenuCompat.createMenu(context, view, R.menu.equinoxcontext, Gravity.START, onContextMenuClick(mode, datetime)).show();
+        return true;
+    }
+
+    private void updateContextMenu(Context context, Menu m, final SolsticeEquinoxMode mode, final long datetime)
+    {
+        Intent data = new Intent();
+        data.putExtra(MenuAddon.EXTRA_SHOW_DATE, datetime);
+        data.putExtra("mode", mode.name());
+
+        setDataToMenu(m, data);
+
+        MenuItem alarmItem = m.findItem(R.id.action_alarm);
+        if (alarmItem != null) {
+            alarmItem.setVisible(AlarmSettings.hasAlarmSupport(context));
+        }
+
+        MenuItem addonSubmenuItem = m.findItem(R.id.addonSubMenu);
+        if (addonSubmenuItem != null) {
+            List<MenuAddon.ActivityItemInfo> addonMenuItems = MenuAddon.queryAddonMenuItems(context);
+            if (!addonMenuItems.isEmpty()) {
+                PopupMenuCompat.forceActionBarIcons(addonSubmenuItem.getSubMenu());
+                MenuAddon.populateSubMenu(addonSubmenuItem, addonMenuItems, datetime);
+            } //else addonSubmenuItem.setVisible(false);
+        }
+    }
+
+    private static void setDataToMenu(Menu m, Intent data)
+    {
+        if (m != null) {
+            for (int i = 0; i < m.size(); i++) {
+                m.getItem(i).setIntent(data);
+                setDataToMenu(m.getItem(i).getSubMenu(), data);
+            }
+        }
+    }
+
+    private PopupMenuCompat.PopupMenuListener onContextMenuClick(final SolsticeEquinoxMode mode, final long datetime)
+    {
+        return new ViewUtils.ThrottledPopupMenuListener(new PopupMenuCompat.PopupMenuListener()
+        {
+            @Override
+            public boolean hasOnDismissListener() {
+                return true;
+            }
+
+            @Override
+            public void onDismiss() {
+                text_title.post(new Runnable() {
+                    @Override
+                    public void run() {                      // a submenu may be shown after the popup is dismissed
+                        unlockScrolling();           // so defer unlockScrolling until after it is shown
+                    }
+                });
+            }
+
+            @Override
+            public void onUpdateMenu(Context context, Menu menu)
+            {
+                updateContextMenu(context, menu, mode, datetime);
+                lockScrolling();   // prevent the popupmenu from nudging the view
+            }
+
+            @Override
+            public boolean onMenuItemClick(MenuItem item)
+            {
+                Context context = getContext();
+                if (context == null) {
+                    return false;
+                }
+
+                Intent itemData = item.getIntent();
+                long itemTime = ((itemData != null) ? itemData.getLongExtra(MenuAddon.EXTRA_SHOW_DATE, -1L) : -1L);
+                SolsticeEquinoxMode itemMode = (itemData != null && itemData.hasExtra("mode") ? SolsticeEquinoxMode.valueOf(itemData.getStringExtra("mode")) : null);
+
+                int itemId = item.getItemId();
+                if (itemId == R.id.action_alarm) {
+                    if (dialogListener != null) {
+                        dialogListener.onSetAlarm(itemMode);
+                        //collapseSheet(getDialog());
+                    }
+                    return true;
+
+                } else if (itemId == R.id.action_sunposition) {
+                    if (dialogListener != null) {
+                        dialogListener.onShowPosition(itemTime);
+                        //collapseSheet(getDialog());
+                    }
+                    return true;
+
+                } else if (itemId == R.id.action_moon) {
+                    if (dialogListener != null) {
+                        dialogListener.onShowMoon(itemTime);
+                    }
+                    return true;
+
+                } else if (itemId == R.id.action_worldmap) {
+                    if (dialogListener != null) {
+                        dialogListener.onShowMap(itemTime);
+                        //collapseSheet(getDialog());
+                    }
+                    return true;
+
+                } else if (itemId == R.id.action_date) {
+                    if (dialogListener != null) {
+                        dialogListener.onShowDate(itemTime);
+                    }
+                    collapseSheet(getDialog());
+                    return true;
+
+                } else if (itemId == R.id.action_calendar) {
+                    openCalendar(context, itemTime);
+                    return true;
+
+                } else if (itemId == R.id.action_share) {
+                    shareItem(context, itemData);
+                    return true;
+                }
+                return false;
+            }
+        });
+    }
+
+    protected void openCalendar(Context context, long itemMillis)
+    {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(Uri.parse("content://com.android.calendar/time/" + itemMillis));
+        context.startActivity(intent);
+    }
+
+    protected void shareItem(Context context, @Nullable Intent itemData)
+    {
+        SolsticeEquinoxMode itemMode = (itemData != null && itemData.hasExtra("mode") ? SolsticeEquinoxMode.valueOf(itemData.getStringExtra("mode")) : null);
+        long itemMillis = itemData != null ? itemData.getLongExtra(MenuAddon.EXTRA_SHOW_DATE, -1L) : -1L;
+        if (itemMode != null && itemMillis != -1L)
+        {
+            Calendar itemTime = Calendar.getInstance();
+            itemTime.setTimeInMillis(itemMillis);
+            boolean showSeconds = WidgetSettings.loadShowSecondsPref(context, 0);
+            boolean showTime = WidgetSettings.loadShowTimeDatePref(context, 0);
+
+            TimeDateDisplay utils = new TimeDateDisplay();
+            SuntimesUtils.initDisplayStrings(context);
+            String itemDisplay = context.getString(R.string.format_share, itemMode, utils.calendarDateTimeDisplayString(AndroidResources.wrap(context), itemTime, showTime, showSeconds).toString());
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+            {
+                ClipboardManager clipboard = (ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText(itemMode.getLongDisplayString(), itemDisplay));
+                }
+            } else {
+                @SuppressWarnings("deprecation")
+                android.text.ClipboardManager clipboard = (android.text.ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    //noinspection deprecation
+                    clipboard.setText(itemDisplay);
+                }
+            }
+            Toast.makeText(context, itemDisplay, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    protected RecyclerView card_view;
+    protected GridLayoutManager card_layout;
+
+    protected void initCardView(Context context, View v)
+    {
+        card_view = (RecyclerView)v.findViewById(R.id.info_equinoxsolstice_flipper1);
+        card_view.setHasFixedSize(true);
+        card_view.setItemViewCacheSize(7);
+        card_view.addItemDecoration(new RecyclerView.MarginDecorator(context, R.dimen.dialog_margin1, 0, R.dimen.dialog_margin1, 0));
+
+        card_view.setOnScrollListener(onCardScrollListener);
+        card_view.suppressLayout(false);
+
+        //new LinearSnapHelper().attachToRecyclerView(card_view);    // one-to-many pages per swipe
+        new PagerSnapHelper().attachToRecyclerView(card_view);       // one page per swipe
+
+        initAdapter(context);
+    }
+
+    protected int card_itemsPerPage = SolsticeEquinoxMode.values().length;
+    protected int card_orientation = LinearLayoutManager.HORIZONTAL;
+    protected EquinoxDataAdapter card_adapter;
+
+    protected void initAdapter(Context context)
+    {
+        boolean southernHemisphere = (WidgetSettings.loadLocalizeHemispherePref(context, 0)) && (WidgetSettings.loadLocationPref(context, 0).getLatitudeAsDouble() < 0);
+        SolsticeEquinoxMode[] modes = AppSettings.loadShowCrossQuarterPref(context) ? SolsticeEquinoxMode.values(southernHemisphere)
+                                                                                                   : SolsticeEquinoxMode.partialValues(southernHemisphere);
+        card_orientation = LinearLayoutManager.HORIZONTAL;
+        card_itemsPerPage = (context.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT ? modes.length : Math.max(4, modes.length / 2));
+        options.highlightPosition = -1;
+
+        card_adapter = new EquinoxDataAdapter(context, modes, options);
+        card_adapter.setAdapterListener(cardListener);
+        card_view.setAdapter(card_adapter);
+
+        card_layout = new GridLayoutManager(context, card_itemsPerPage, card_orientation, false);
+        card_view.setLayoutManager(card_layout);
+        card_view.scrollToPosition(EquinoxDatasetAdapter.CENTER_POSITION + modes.length);
+
+        //ViewGroup.LayoutParams params = card_view.getLayoutParams();
+        //params.height = (int)Math.ceil(card_itemsPerPage * context.getResources().getDimension(R.dimen.equinoxItem_height)) + 2;
+        //card_view.setLayoutParams(params);
+    }
+
+    private final RecyclerView.OnScrollListenerCompat onCardScrollListener = new RecyclerView.OnScrollListenerCompat()
+    {
+        @Override
+        public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy)
+        {
+            final int position = currentCardPosition();
+            if (position >= 0) {
+                //Log.d("DEBUG", "onScrolled: position: " + position);
+                text_title.post(new Runnable()
+                {
+                    @Override
+                    public void run() {
+                        Context context = getContext();
+                        if (context != null) {
+                            updateViews(context, card_adapter.initData(context, position));
+                        }
+                    }
+                });
+            }
+        }
+
+        @Override
+        public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState)
+        {
+            super.onScrollStateChanged(recyclerView, newState);
+            if (newState ==  RecyclerView.SCROLL_STATE_DRAGGING) {
+                setUserSwappedCard(true);
+            }
+        }
+    };
+
+    private void showEmptyView( boolean show ) {
+        empty.setVisibility(show ? View.VISIBLE : View.GONE);
+        card_view.setVisibility(show ? View.GONE : View.VISIBLE);
+    }
+
+    public void lockScrolling() {
+        card_view.suppressLayout(true);
+    }
+    public void unlockScrolling() {
+        card_view.suppressLayout(false);
+    }
+
+    public int currentCardPosition()
+    {
+        int first = card_layout.findFirstVisibleItemPosition();
+        //int last = card_layout.findLastVisibleItemPosition();
+        //int p = (first + last) / 2;
+        //Log.d("DEBUG", "currentCardPosition: " + first + ", " + last + " => " + p);
+        return first;
+    }
+
+    public boolean showNextCard(@NonNull Context context, int position)
+    {
+        int nextPosition = (position + card_itemsPerPage);
+        int n = card_adapter.getItemCount();
+        if (nextPosition < n) {
+            setUserSwappedCard(true);
+            CardAdapter.CardViewScroller card_scroller = new CardAdapter.CardViewScroller(context);
+            card_scroller.setTargetPosition(nextPosition);
+            card_layout.startSmoothScroll(card_scroller);
+        }
+        return true;
+    }
+
+    public boolean showPreviousCard(@NonNull Context context, int position)
+    {
+        int prevPosition = (position - card_itemsPerPage);
+        if (prevPosition >= 0) {
+            setUserSwappedCard(true);
+            CardAdapter.CardViewScroller card_scroller = new CardAdapter.CardViewScroller(context);
+            card_scroller.setTargetPosition(prevPosition);
+            card_layout.startSmoothScroll(card_scroller);
+        }
+        return true;
+    }
+
+    private final EquinoxAdapterListener cardListener = new EquinoxAdapterListener()
+    {
+        @Override
+        public void onClick( int position ) {
+            card_adapter.setSelection(position);
+        }
+        @Override
+        public boolean onLongClick( int position ) {
+            return false;
+        }
+        @Override
+        public void onTitleClick( int position ) {
+            onTitleClicked(position);
+        }
+        @Override
+        public void onNextClick( int position ) {
+            onNextClicked(position);
+        }
+        @Override
+        public void onPrevClick( int position ) {
+            onPrevClicked(position);
+        }
+        @Override
+        public void onMenuClick(View view, int position, SolsticeEquinoxMode mode, long datetime) {
+            if (getContext() != null) {
+                showContextMenu(getContext(), view, mode, datetime);
+            }
+        }
+    };
+
+    @Nullable
+    public SolsticeEquinoxMode getSelection() {
+        return card_adapter.getSelection();
+    }
+    public boolean hasSelection() {
+        return card_adapter.hasSelection();
+    }
+    public void setSelection(@Nullable SolsticeEquinoxMode mode) {
+        card_adapter.setSelection(mode);
+    }
+    public void setSelection(@Nullable Integer position) {
+        card_adapter.setSelection(position);
+    }
+
+    public void adjustColumnWidth(int columnWidthPx)
+    {
+        options.columnWidthPx = columnWidthPx;
+        if (card_adapter != null) {
+            card_adapter.notifyDataSetChanged();
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private EquinoxDialogListener dialogListener = null;
+    public void setDialogListener( EquinoxDialogListener listener ) {
+        dialogListener = listener;
+    }
+
+    /**
+     * DialogListener
+     */
+    public static class EquinoxDialogListener
+    {
+        public void onSetAlarm( @Nullable SolsticeEquinoxMode suggestedEvent ) {}
+        public void onShowMap( long suggestedDate ) {}
+        public void onShowMoon( long suggestedDate ) {}
+        public void onShowPosition( long suggestedDate ) {}
+        public void onShowDate( long suggestedDate ) {}
+        public void onOptionsModified(boolean closeDialog) {}
+        public void onColorsModified( @Nullable ColorValues values ) {}
+    }
+
+
+}

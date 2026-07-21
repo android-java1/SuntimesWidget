@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2019 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:background="?attr/dialogBackground">
+
+    <LinearLayout
+        android:id="@+id/dialog_header"
+        android:background="?attr/dialogFrame"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingLeft="?dialogPreferredPadding" android:paddingRight="?dialogPreferredPadding"
+        android:paddingTop="16dp" android:paddingBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/dialog_title"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:gravity="start" style="@style/Base.DialogWindowTitle.AppCompat"
+                android:text="@string/color_dialog_msg" />
+
+            <TextView
+                android:id="@+id/dialog_subtitle" android:visibility="gone"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:gravity="start" style="@style/DialogSubTitleStyle"
+                tools:text="Background" />
+
+        </LinearLayout>
+
+        <com.forrestguice.support.widget.TabLayout
+            android:id="@+id/color_pager_tabs" android:visibility="visible"
+            android:layout_width="wrap_content" android:layout_height="match_parent"
+            app:tabIndicatorHeight="2dp" app:tabGravity="center" app:tabPaddingEnd="10dp" app:tabPaddingStart="10dp"
+            android:layout_gravity="end">
+
+            <com.forrestguice.support.widget.TabItem
+                android:id="@+id/tabItem"
+                android:layout_width="48dp" android:layout_height="wrap_content"
+                android:text="@string/color_dialog_tab1" />
+
+            <com.forrestguice.support.widget.TabItem
+                android:id="@+id/tabItem2"
+                android:layout_width="48dp" android:layout_height="wrap_content"
+                android:text="@string/color_dialog_tab2" />
+
+            <com.forrestguice.support.widget.TabItem
+                android:id="@+id/tabItem3"
+                android:layout_width="48dp" android:layout_height="wrap_content"
+                android:text="@string/color_dialog_tab3" />
+
+            <com.forrestguice.support.widget.TabItem
+                android:id="@+id/tabItem4"
+                android:layout_width="48dp" android:layout_height="wrap_content"
+                android:text="@string/color_dialog_tab4" />
+
+        </com.forrestguice.support.widget.TabLayout>
+
+    </LinearLayout>
+
+    <com.forrestguice.suntimeswidget.settings.colors.NoSwipeViewPager
+        android:id="@+id/color_pager"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:paddingLeft="?dialogPreferredPadding" android:paddingRight="?dialogPreferredPadding"
+        android:layout_marginTop="8dp" android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent" android:text="@string/color_dialog_recent"
+        android:paddingLeft="?dialogPreferredPadding" android:paddingRight="?dialogPreferredPadding"
+        android:textSize="?attr/text_size_small" />
+
+    <com.forrestguice.support.widget.RecyclerView
+        android:id="@+id/color_recent"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingLeft="?dialogPreferredPadding" android:paddingRight="?dialogPreferredPadding"
+        android:layout_marginTop="4dp" android:elevation="5dp"
+        android:paddingBottom="8dp" android:layout_marginBottom="4dp"
+        android:orientation="horizontal" app:layoutManager="@string/layoutManager_LinearLayoutManager"
+        tools:itemCount="16" tools:listitem="@layout/layout_listitem_color" />
+
+
+    <LinearLayout
+        android:id="@+id/dialog_footer"
+        android:background="?attr/dialogFrame"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical|end"
+        android:paddingLeft="?dialogPreferredPadding" android:paddingRight="?dialogPreferredPadding"
+        android:paddingTop="8dp" android:paddingBottom="8dp">
+
+        <Button
+            style="@style/Widget.AppCompat.Button.ButtonBar.AlertDialog"
+            android:id="@+id/dialog_button_suggest"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/color_dialog_suggest" />
+
+        <View android:layout_weight="1"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:background="@null" />
+
+        <Button
+            style="@style/Widget.AppCompat.Button.ButtonBar.AlertDialog"
+            android:id="@+id/dialog_button_cancel"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/color_dialog_cancel"
+            tools:ignore="ButtonOrder" />
+
+        <Button
+            style="@style/Widget.AppCompat.Button.ButtonBar.AlertDialog"
+            android:id="@+id/dialog_button_accept"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/color_dialog_ok" />
+
+    </LinearLayout>
+
+</LinearLayout>

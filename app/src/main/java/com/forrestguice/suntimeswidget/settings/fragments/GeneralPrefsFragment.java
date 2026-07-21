@@ -1,0 +1,412 @@
+/**
+    Copyright (C) 2014-2023 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package com.forrestguice.suntimeswidget.settings.fragments;
+
+import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.res.TypedArray;
+import android.os.Build;
+import android.os.Bundle;
+
+import android.preference.PreferenceManager;
+
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.style.ImageSpan;
+import android.util.Log;
+
+import com.forrestguice.annotation.Nullable;
+import com.forrestguice.suntimeswidget.ExceptionActivity;
+import com.forrestguice.suntimeswidget.ExceptionHandler;
+import com.forrestguice.suntimeswidget.R;
+import com.forrestguice.suntimeswidget.SuntimesSettingsActivity;
+import com.forrestguice.suntimeswidget.WelcomeActivity;
+import com.forrestguice.suntimeswidget.calculator.SuntimesCalculatorDescriptor;
+import com.forrestguice.suntimeswidget.calculator.core.SuntimesCalculator;
+import com.forrestguice.suntimeswidget.calculator.settings.TimeFormatMode;
+import com.forrestguice.suntimeswidget.calculator.settings.display.TimeDateDisplay;
+import com.forrestguice.suntimeswidget.settings.AppSettings;
+import com.forrestguice.suntimeswidget.settings.HelpPreference;
+import com.forrestguice.suntimeswidget.settings.SettingsActivityInterface;
+import com.forrestguice.suntimeswidget.settings.SummaryListPreference;
+import com.forrestguice.suntimeswidget.settings.WidgetSettings;
+
+import com.forrestguice.suntimeswidget.views.IconUtils;
+import com.forrestguice.suntimeswidget.views.SpanUtils;
+import com.forrestguice.suntimeswidget.views.Toast;
+import com.forrestguice.support.app.AlertDialog;
+import com.forrestguice.support.content.ContextCompat;
+import com.forrestguice.support.preference.CheckBoxPreference;
+import com.forrestguice.support.preference.ListPreference;
+import com.forrestguice.support.preference.Preference;
+import com.forrestguice.support.preference.PreferenceFragment;
+import com.forrestguice.util.android.AndroidResources;
+
+/**
+ * General Prefs
+ */
+@TargetApi(Build.VERSION_CODES.HONEYCOMB)
+public class GeneralPrefsFragment extends PreferenceFragment
+{
+    public static final String LOG_TAG = "SuntimesSettings";
+
+    private SummaryListPreference sunCalculatorPref, moonCalculatorPref;
+    private CheckBoxPreference useAltitudePref;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey)
+    {
+        AppSettings.initLocale(getActivity());
+        Log.i(SuntimesSettingsActivity.LOG_TAG, "GeneralPrefsFragment: Arguments: " + getArguments());
+
+        PreferenceManager.setDefaultValues(getActivity(), R.xml.preference_general, false);
+        addPreferencesFromResource(R.xml.preference_general);
+
+        sunCalculatorPref = (SummaryListPreference) findPreference(WidgetSettings.keyCalculatorModePref(0));
+        moonCalculatorPref = (SummaryListPreference) findPreference(WidgetSettings.keyCalculatorModePref(0, "moon"));
+
+        initPref_general(GeneralPrefsFragment.this);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data)
+    {
+        Log.d(SuntimesSettingsActivity.LOG_TAG, "onActivityResult: " + requestCode + " (" + resultCode + ")");
+        switch(requestCode)
+        {
+            case SettingsActivityInterface.REQUEST_WELCOME_SCREEN:
+                onWelcomeScreen(requestCode, resultCode, data);
+                break;
+        }
+    }
+
+    @Override
+    @TargetApi(Build.VERSION_CODES.M)
+    public void onAttach(Context context)
+    {
+        super.onAttach(context);
+        loadPref_calculator(context, sunCalculatorPref);
+        loadPref_calculator(context, moonCalculatorPref, "moon");
+    }
+
+    @Override
+    public void onAttach(Activity activity)
+    {
+        super.onAttach(activity);
+        loadPref_calculator(activity, sunCalculatorPref);
+        loadPref_calculator(activity, moonCalculatorPref, "moon");
+    }
+
+
+    private void onWelcomeScreen(int requestCode, int resultCode, Intent data)
+    {
+        //Log.d("DEBUG", "onWelcomeScreen");
+        if (!isAdded()) {
+            Log.w(SuntimesSettingsActivity.LOG_TAG, "onWelcomeScreen: fragment has not yet been added to activity; ignoring result..");
+            return;
+        }
+
+        Activity activity = getActivity();
+        if (activity instanceof SuntimesSettingsActivity)
+        {
+            SuntimesSettingsActivity settingsActivity = (SuntimesSettingsActivity) activity;
+            settingsActivity.setNeedsRecreateFlag();
+            settingsActivity.rebuildActivity();
+
+        } else {
+            Log.w(SuntimesSettingsActivity.LOG_TAG, "onWelcomeScreen: parent activity is not SuntimesSettingsActivity; ignoring result..");
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    public static void initPref_general(final PreferenceFragment fragment)
+    {
+        Log.i(LOG_TAG, "initPref_general (fragment)");
+        Context context = fragment.getActivity();
+
+        String key_timeFormat = WidgetSettings.PREF_PREFIX_KEY + "0" + WidgetSettings.PREF_PREFIX_KEY_APPEARANCE + WidgetSettings.PREF_KEY_APPEARANCE_TIMEFORMATMODE;
+        ListPreference timeformatPref = (ListPreference)fragment.findPreference(key_timeFormat);
+        if (timeformatPref != null)
+        {
+            initPref_timeFormat(fragment.getActivity(), timeformatPref);
+            loadPref_timeFormat(fragment.getActivity(), timeformatPref);
+        }
+
+        String key_altitudePref = WidgetSettings.PREF_PREFIX_KEY + "0" + WidgetSettings.PREF_PREFIX_KEY_LOCATION + WidgetSettings.PREF_KEY_LOCATION_ALTITUDE_ENABLED;
+        CheckBoxPreference altitudePref = (CheckBoxPreference)fragment.findPreference(key_altitudePref);
+        if (altitudePref != null)
+        {
+            initPref_altitude(context, altitudePref);
+            loadPref_altitude(context, altitudePref);
+        }
+
+        String key_sunCalc = WidgetSettings.keyCalculatorModePref(0);
+        SummaryListPreference calculatorPref = (SummaryListPreference) fragment.findPreference(key_sunCalc);
+        if (calculatorPref != null)
+        {
+            initPref_calculator(context, calculatorPref, WidgetSettings.PREF_DEF_GENERAL_CALCULATOR);
+            loadPref_calculator(context, calculatorPref);
+        }
+
+        String key_moonCalc = WidgetSettings.keyCalculatorModePref(0, "moon");
+        SummaryListPreference moonCalculatorPref = (SummaryListPreference) fragment.findPreference(key_moonCalc);
+        if (moonCalculatorPref != null)
+        {
+            initPref_calculator(context, moonCalculatorPref, new int[] {SuntimesCalculator.FEATURE_MOON}, WidgetSettings.PREF_DEF_GENERAL_CALCULATOR_MOON);
+            loadPref_calculator(context, moonCalculatorPref, "moon");
+        }
+
+        Preference introScreenPref = (Preference) fragment.findPreference("appwidget_0_intro_screen");
+        if (introScreenPref != null)
+        {
+            introScreenPref.setIcon(IconUtils.getPreferenceIcon(context, R.attr.icActionSettings, R.drawable.ic_action_settings));
+            introScreenPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener()
+            {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    showWelcome(fragment);
+                    return false;
+                }
+            });
+        }
+        Preference crashReportPref = (Preference) fragment.findPreference("appwidget_0_crashreport");
+        if (crashReportPref != null)
+        {
+            crashReportPref.setIcon(IconUtils.getPreferenceIcon(context, R.attr.icActionError, R.drawable.ic_action_report_dark));
+            crashReportPref.setSummary(getCrashReportSummary(context));
+            crashReportPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    showCrashReportDialog(fragment.getActivity(), crashReportPref);
+                    return false;
+                }
+            });
+        }
+        HelpPreference dataSourcePref = (HelpPreference) fragment.findPreference("appwidget_0_general_calculator_help");
+        if (dataSourcePref != null) {
+            dataSourcePref.setIcon(IconUtils.getPreferenceIcon(context, R.attr.icActionHelp, R.drawable.ic_action_help_dark));
+        }
+    }
+
+    public static void initPref_calculator(Context context, final SummaryListPreference calculatorPref, String defaultCalculator)
+    {
+        initPref_calculator(context, calculatorPref, null, defaultCalculator);
+    }
+    public static void initPref_calculator(Context context, final SummaryListPreference calculatorPref, @Nullable int[] requestedFeatures, String defaultCalculator)
+    {
+        String tagDefault = context.getString(R.string.tag_tagDefault);
+        String tagPlugin = context.getString(R.string.tag_tagPlugin);
+
+        int[] colorAttrs = { R.attr.text_accentColor, R.attr.tagColor_warning };
+        @SuppressLint("ResourceType")
+        TypedArray typedArray = context.obtainStyledAttributes(colorAttrs);
+        int colorDefault = ContextCompat.getColor(context, typedArray.getResourceId(0, R.color.text_accent_dark));
+        @SuppressLint("ResourceType") int colorPlugin = ContextCompat.getColor(context, typedArray.getResourceId(1, R.color.warningTag_dark));
+        typedArray.recycle();
+
+        SuntimesCalculatorDescriptor[] calculators = (requestedFeatures == null ? SuntimesCalculatorDescriptor.values()
+                : SuntimesCalculatorDescriptor.values(requestedFeatures));
+        String[] calculatorEntries = new String[calculators.length];
+        String[] calculatorValues = new String[calculators.length];
+        CharSequence[] calculatorSummaries = new CharSequence[calculators.length];
+
+        int i = 0;
+        for (SuntimesCalculatorDescriptor calculator : calculators)
+        {
+            int resID = calculator.getDisplayStringResID();
+            if (resID != -1 ){
+                calculator.setDisplayString(context.getString(resID));
+            }
+
+            calculatorEntries[i] = calculatorValues[i] = calculator.getName();
+
+            String displayString = (calculator.getName().equalsIgnoreCase(defaultCalculator))
+                    ? context.getString(R.string.tag_prefSummaryTagged, calculator.getDisplayString(), tagDefault)
+                    : calculator.getDisplayString();
+
+            if (calculator.isPlugin()) {
+                displayString = context.getString(R.string.tag_prefSummaryTagged, displayString, tagPlugin);
+            }
+
+            SpannableString styledSummary = SpanUtils.createBoldColorSpan(null, displayString, tagDefault, colorDefault);
+            styledSummary = SpanUtils.createRelativeSpan(styledSummary, displayString, tagDefault, 1.15f);
+
+            styledSummary = SpanUtils.createBoldColorSpan(styledSummary, displayString, tagPlugin, colorPlugin);
+            styledSummary = SpanUtils.createRelativeSpan(styledSummary, displayString, tagPlugin, 1.15f);
+
+            calculatorSummaries[i] = styledSummary;
+            i++;
+        }
+
+        calculatorPref.setEntries(calculatorEntries);
+        calculatorPref.setEntryValues(calculatorValues);
+        calculatorPref.setEntrySummaries(calculatorSummaries);
+    }
+    public static void loadPref_calculator(Context context, SummaryListPreference calculatorPref)
+    {
+        loadPref_calculator(context, calculatorPref, "");
+    }
+    public static void loadPref_calculator(Context context, SummaryListPreference calculatorPref, String calculatorName)
+    {
+        if (context != null && calculatorPref != null)
+        {
+            SuntimesCalculatorDescriptor currentMode = WidgetSettings.loadCalculatorModePref(context, 0, calculatorName);
+            int currentIndex = ((currentMode != null) ? calculatorPref.findIndexOfValue(currentMode.getName()) : -1);
+            if (currentIndex >= 0)
+            {
+                calculatorPref.setValueIndex(currentIndex);
+
+            } else {
+                Log.w(LOG_TAG, "loadPref: Unable to load calculator preference! The list is missing an entry for the descriptor: " + currentMode);
+                calculatorPref.setValue(null);  // reset to null (so subsequent selection by user gets saved and fixes this condition)
+            }
+        }
+    }
+
+    public static void initPref_timeFormat(final Activity context, final ListPreference timeformatPref)
+    {
+        timeformatPref.setOnPreferenceChangeListener(new ListPreference.OnPreferenceChangeListener()
+        {
+            @Override
+            public boolean onPreferenceChange(ListPreference preference, Object o)
+            {
+                timeformatPref.setSummary(timeFormatPrefSummary(TimeFormatMode.valueOf((String)o), context));
+                return true;
+            }
+        });
+    }
+
+    public static void loadPref_timeFormat(final Activity context, final ListPreference timeformatPref)
+    {
+        TimeFormatMode mode = WidgetSettings.loadTimeFormatModePref(context, 0);
+        int index = timeformatPref.findIndexOfValue(mode.name());
+        if (index < 0)
+        {
+            index = 0;
+            TimeFormatMode mode0 = mode;
+            mode = TimeFormatMode.values()[index];
+            Log.w("loadPref", "timeFormat not found (" + mode0 + ") :: loading " + mode.name() + " instead..");
+        }
+        timeformatPref.setValueIndex(index);
+        timeformatPref.setSummary(timeFormatPrefSummary(mode, context));
+    }
+
+    public static String timeFormatPrefSummary(TimeFormatMode mode, Context context)
+    {
+        String summary = "%s";
+        if (mode == TimeFormatMode.MODE_SYSTEM)
+        {
+            String sysPref = android.text.format.DateFormat.is24HourFormat(context)
+                    ? TimeFormatMode.MODE_24HR.getDisplayString()
+                    : TimeFormatMode.MODE_12HR.getDisplayString();
+            summary = context.getString(R.string.settings_timeFormatMode_systemsummary, "%s", sysPref);
+        }
+        return summary;
+    }
+
+    public static void initPref_altitude(Context context, final CheckBoxPreference altitudePref)
+    {
+        int drawableID = IconUtils.getThemedIcon(context, R.attr.icActionAltitude, R.drawable.ic_action_terrain_ref);
+        String title = context.getString(R.string.settings_general_altitude_enabled) + " [i]";
+        int iconSize = (int) context.getResources().getDimension(R.dimen.prefSummaryIcon_size);
+        ImageSpan altitudeIcon = SpanUtils.createImageSpan(context, drawableID, iconSize, iconSize, 0, null);
+        SpannableStringBuilder altitudeSpan = SpanUtils.createSpan(context, title, "[i]", altitudeIcon);
+        altitudePref.setTitle(altitudeSpan);
+    }
+
+    public static void loadPref_altitude(Context context, CheckBoxPreference altitudePref)
+    {
+        boolean useAltitude = WidgetSettings.loadLocationAltitudeEnabledPref(context, 0);
+        altitudePref.setChecked(useAltitude);
+    }
+
+    protected static void showWelcome(PreferenceFragment fragment)
+    {
+        Activity activity = (fragment != null ? fragment.getActivity() : null);
+        if (fragment != null && activity != null) {
+            fragment.startActivityForResult(new Intent(activity, WelcomeActivity.class), SettingsActivityInterface.REQUEST_WELCOME_SCREEN);
+        }
+    }
+
+    protected static void showCrashReportDialog(Context context, Preference preference)
+    {
+        if (context != null)
+        {
+            AlertDialog.Builder dialog = new AlertDialog.Builder(context)
+                    .setTitle(context.getString(R.string.crash_dialog_title))
+                    .setIcon(IconUtils.getAlertDialogIcon(context, R.attr.icActionError, R.drawable.ic_action_report_ref));
+
+            String reportContent = ExceptionHandler.getLastCrashReport(context);
+            if (reportContent != null)
+            {
+                dialog.setMessage(getCrashReportSummary(context));
+                dialog.setPositiveButton(context.getString(R.string.crash_dialog_view), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        context.startActivity(ExceptionHandler.getCrashReportActivityIntent(context, reportContent));
+                    }
+                });
+                dialog.setNeutralButton(context.getString(R.string.crash_dialog_clear), new DialogInterface.OnClickListener()
+                {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        ExceptionHandler.clearLastCrashReport(context);
+                        preference.setSummary(getCrashReportSummary(context));
+                        Toast.makeText(context, context.getString(R.string.crash_dialog_cleared), Toast.LENGTH_SHORT).show();
+                    }
+                });
+                dialog.setNegativeButton(context.getString(R.string.crash_dialog_copy), new DialogInterface.OnClickListener()
+                {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        ExceptionActivity.copyToClipboard(context, reportContent);
+                    }
+                });
+
+            } else {
+                dialog.setMessage(context.getString(R.string.settings_crashreport_summary));
+                dialog.setPositiveButton(context.getString(R.string.dialog_ok), null);
+            }
+            dialog.show();
+        }
+    }
+    protected static CharSequence getCrashReportSummary(Context context)
+    {
+        if (ExceptionHandler.hasLastCrashReport(context))
+        {
+            long reportDate = ExceptionHandler.getLastCrashReportDate(context);
+            TimeDateDisplay dateUtils = new TimeDateDisplay();
+            String dateDisplay = (reportDate > 0 ? dateUtils.calendarDateTimeDisplayString(AndroidResources.wrap(context), reportDate).toString() : null);
+            CharSequence reportSummary = (dateDisplay != null
+                    ? context.getString(R.string.settings_crashreport_summary1, context.getString(R.string.app_name), dateDisplay)
+                    : context.getString(R.string.crash_dialog_message, context.getString(R.string.app_name)));
+            return reportSummary;
+        } else return context.getString(R.string.settings_crashreport_summary);
+    }
+
+}

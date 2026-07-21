@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <group android:checkableBehavior="none">
+
+        <item android:id="@+id/deleteAlarm"
+            android:title="@string/alarms_action_deleteAlarm"
+            android:icon="?attr/icActionDelete"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmType"
+            android:title="@string/alarms_action_setAlarmType"
+            android:icon="?attr/icActionNotification"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmLabel"
+            android:title="@string/alarms_action_setAlarmLabel"
+            android:icon="?attr/icActionEdit"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmNote"
+            android:title="@string/alarms_action_setAlarmNote"
+            android:icon="?attr/icActionEdit"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmSound"
+            android:title="@string/alarms_action_setAlarmSound"
+            android:icon="?attr/icActionSoundEnabled"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmEvent"
+            android:title="@string/alarms_action_setAlarmEvent"
+            android:icon="?attr/icActionAlarm"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmOffset"
+            android:title="@string/alarms_action_setAlarmOffset"
+            android:icon="?attr/icActionAlarm"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmLocation"
+            android:title="@string/alarms_action_setAlarmLocation"
+            android:icon="?attr/icActionPlace"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmRepeat"
+            android:title="@string/alarms_action_setAlarmRepeat"
+            android:icon="?attr/icActionCalendar"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmTime"
+            android:title="@string/alarms_action_setAlarmTime"
+            android:icon="?attr/icActionAlarm"
+            app:showAsAction="never" />
+
+        <item android:id="@+id/setAlarmAction"
+            android:title="@string/alarms_action_setAlarmAction"
+            android:icon="?attr/icActionExtension"
+            app:showAsAction="never" />
+
+    </group>
+</menu>

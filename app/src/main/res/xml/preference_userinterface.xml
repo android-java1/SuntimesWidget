@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_appearance">
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="app_appearance_theme"
+            android:title="@string/settings_appearance_mode"
+            android:dialogTitle="@string/settings_appearance_mode"
+            android:summary="%s"
+            android:entries="@array/appThemes_display" android:entryValues="@array/appThemes_values"
+            android:defaultValue="@string/def_app_appearance_theme"/>
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_appearance_theme_light"
+            android:title="@string/themes_appThemes_lightTheme"
+            android:dialogTitle="@string/themes_appThemes_lightTheme"
+            android:widgetLayout="@layout/layout_pref_themewidget"
+            android:summary="%s"
+            app:actionButtonContentDescription="@string/actionDesc_themeList" />
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_appearance_theme_dark"
+            android:title="@string/themes_appThemes_darkTheme"
+            android:dialogTitle="@string/themes_appThemes_darkTheme"
+            android:widgetLayout="@layout/layout_pref_themewidget"
+            android:summary="%s"
+            app:actionButtonContentDescription="@string/actionDesc_themeList" />
+
+        <com.forrestguice.suntimeswidget.settings.TextSizePreference
+            android:key="app_appearance_textsize"
+            android:title="@string/textSize_pref_title"
+            android:summary="@string/textSize_pref_summary"
+            android:entries="@array/textSize_display" android:entryValues="@array/textSize_values"
+            android:defaultValue="@string/def_app_appearance_textsize" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_navigation">
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="app_navigation_mode"
+            android:title="@string/settings_navigation_mode"
+            android:dialogTitle="@string/settings_navigation_mode"
+            android:summary="%s"
+            android:entries="@array/settings_navMode_display" android:entryValues="@array/settings_navMode_values"
+            android:defaultValue="@string/def_app_navigation_mode"/>
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="app_launcher_mode"
+            android:title="@string/settings_ui_launcherMode"
+            android:dialogTitle="@string/settings_ui_launcherMode"
+            android:summary="%s"
+            android:entries="@array/settings_launcherMode_display" android:entryValues="@array/settings_launcherMode_values"
+            android:defaultValue="@string/def_app_launcher_mode" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:key="custom_events"
+        android:title="@string/settings_ui_fields1">
+
+        <com.forrestguice.support.preference.Preference
+            android:key="manage_events"
+            android:title="@string/events_pref_manageEvents"
+            android:icon="?attr/icActionEvents"
+            android:summary="@string/events_pref_manageEvents_summary"
+            android:persistent="false" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_ui_fields">
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_3"
+            android:title="@string/timeMode_astronomical"
+            android:defaultValue="true" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_2"
+            android:title="@string/timeMode_nautical"
+            android:defaultValue="true" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_6"
+            android:title="@string/settings_ui_showbluehour"
+            android:defaultValue="@bool/def_app_ui_showbluehour" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_1"
+            android:title="@string/timeMode_civil"
+            android:defaultValue="true" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_0"
+            android:title="@string/timeMode_official"
+            android:defaultValue="true" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_4"
+            android:title="@string/timeMode_noon"
+            android:defaultValue="true" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_5"
+            android:title="@string/settings_ui_showgoldhour"
+            android:defaultValue="@bool/def_app_ui_showgoldhour" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showfields_7"
+            android:title="@string/timeMode_midnight"
+            android:defaultValue="@bool/def_app_ui_showmidnight" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <!--<PreferenceCategory
+        android:title="@string/configLabel_ui_showheaders">
+    </PreferenceCategory>-->
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_ui">
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="app_ui_emphasizefield"
+            android:title="@string/settings_ui_emphasizefield_text"
+            android:summary="@string/settings_ui_emphasizefield_summary"
+            android:entries="@array/settings_emphasizefield_display" android:entryValues="@array/settings_emphasizefield_values"
+            android:defaultValue="@string/def_app_ui_emphasizefield" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showheader_icon"
+            android:title="@string/settings_ui_showheader_icon"
+            android:defaultValue="@bool/def_app_ui_showheader_icon" />
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="app_ui_showheader_text1"
+            android:title="@string/settings_ui_showheader_text"
+            android:summary="@string/settings_ui_showheader_text_summary"
+            android:entries="@array/settings_headerText_display" android:entryValues="@array/settings_headerText_values"
+            android:defaultValue="@string/def_app_ui_showheader_text" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showcoordinates"
+            android:title="@string/settings_ui_showcoordinates"
+            android:summary="@string/settings_ui_showcoordinates_summary"
+            android:defaultValue="@bool/def_app_ui_showcoordinates" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showmapbutton"
+            android:title="@string/settings_ui_showmapbutton"
+            android:summary="@string/settings_ui_showmapbutton_summary"
+            android:defaultValue="@bool/def_app_ui_showmapbutton" />
+
+        <CheckBoxPreference
+            android:key="app_ui_showdatasource"
+            android:title="@string/settings_ui_showdatasource"
+            android:summary="@string/settings_ui_showdatasource_summary"
+            android:defaultValue="@bool/def_app_ui_showdatasource" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="appwidget_0_general_showcompare"
+            android:title="@string/settings_general_showComparison"
+            android:summary="@string/settings_general_showComparison_summary"
+            android:defaultValue="@bool/def_appwidget_0_general_showcompare" />
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="appwidget_0_general_comparemode"
+            android:title="@string/settings_general_compareMode"
+            android:summary="%s"
+            android:entries="@array/settings_compareMode_display" android:entryValues="@array/settings_compareMode_values"
+            android:defaultValue="@string/def_appwidget_0_general_comparemode" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showlightmap"
+            android:title="@string/settings_ui_showLightmap"
+            android:summary="@string/settings_ui_showLightmap_summary"
+            android:defaultValue="@bool/def_app_ui_showlightmap" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showmoon"
+            android:title="@string/settings_ui_showmoon"
+            android:summary="@string/settings_ui_showmoon_summary"
+            android:defaultValue="@bool/def_app_ui_showmoon" />
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showmoon_noon"
+            android:title="@string/settings_ui_showmoon_noon"
+            android:summary="@string/settings_ui_showmoon_noon_summary"
+            android:defaultValue="@bool/def_app_ui_showmoon_noon" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showequinox"
+            android:title="@string/settings_ui_showEquinox"
+            android:summary="@string/settings_ui_showEquinox_summary"
+            android:defaultValue="@bool/def_app_ui_showequinox" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showequinox_date"
+            android:title="@string/settings_ui_showEquinoxDate"
+            android:summary="@string/settings_ui_showEquinoxDate_summary"
+            android:defaultValue="@bool/def_app_ui_showequinox_date" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showcrossquarter"
+            android:title="@string/settings_ui_showCrossQuarter"
+            android:summary="@string/settings_ui_showCrossQuarter_summary"
+            android:defaultValue="@bool/def_app_ui_showcrossquarter" />
+
+        <com.forrestguice.support.preference.ListPreference
+            android:key="appwidget_0_general_trackingmode"
+            android:title="@string/settings_ui_solsticeTrackingMode"
+            android:summary="@string/settings_ui_solsticeTrackingMode_summary"
+            android:entries="@array/settings_solsticeTrackingMode_display" android:entryValues="@array/settings_solsticeTrackingMode_values"
+            android:defaultValue="@string/def_appwidget_0_general_trackingmode" />
+
+        <com.forrestguice.suntimeswidget.settings.LengthPreference
+            android:key="appwidget_0_general_observerheight"
+            android:title="@string/settings_general_observerheight"
+            android:summary="@string/settings_general_observerheight_summary"
+            android:defaultValue="@string/def_appwidget_0_general_observerheight" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_ui_showwarnings"
+            android:title="@string/settings_ui_showWarnings"
+            android:summary="@string/settings_ui_showWarnings_summary"
+            android:defaultValue="@bool/def_app_ui_showwarnings" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="app_accessibility_verbose"
+            android:title="@string/settings_accessibility_verbose"
+            android:summary="@string/settings_accessibility_verbose_summary"
+            android:defaultValue="@bool/def_app_accessibility_verbose" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_ui_misc">
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="appwidget_0_general_showweeks"
+            android:title="@string/settings_general_showWeeks"
+            android:summary="@string/settings_general_showWeeks_summary" android:defaultValue="@bool/def_appwidget_0_general_showweeks" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="appwidget_0_general_showhours"
+            android:title="@string/settings_general_showHours"
+            android:summary="@string/settings_general_showHours_summary" android:defaultValue="@bool/def_appwidget_0_general_showhours" />
+
+        <com.forrestguice.support.preference.CheckBoxPreference
+            android:key="appwidget_0_general_showtimedate"
+            android:title="@string/settings_general_showTimeDate"
+            android:summary="@string/settings_general_showTimeDate_summary" android:defaultValue="@bool/def_appwidget_0_general_showtimedate" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/settings_action">
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_ui_clocktapaction"
+            android:title="@string/settings_action_onClockTap"
+            android:dialogTitle="@string/settings_action_onClockTap"
+            android:summary="%s" android:widgetLayout="@layout/layout_pref_action"
+            android:entries="@array/actions_clockTapActions_display" android:entryValues="@array/actions_clockTapActions_values"
+            android:defaultValue="@string/def_app_ui_clocktapaction"
+            app:actionButtonContentDescription="@string/actionDesc_actionList" />
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_ui_datetapaction"
+            android:title="@string/settings_action_onDateTap"
+            android:dialogTitle="@string/settings_action_onDateTap"
+            android:summary="%s" android:widgetLayout="@layout/layout_pref_action"
+            android:entries="@array/actions_dateTapActions_display" android:entryValues="@array/actions_dateTapActions_values"
+            android:defaultValue="@string/def_app_ui_datetapaction"
+            app:actionButtonContentDescription="@string/actionDesc_actionList" />
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_ui_datetapaction1"
+            android:title="@string/settings_action_onDateTap1"
+            android:dialogTitle="@string/settings_action_onDateTap1"
+            android:summary="%s" android:widgetLayout="@layout/layout_pref_action"
+            android:entries="@array/actions_dateTapActions_display" android:entryValues="@array/actions_dateTapActions_values"
+            android:defaultValue="@string/def_app_ui_datetapaction1"
+            app:actionButtonContentDescription="@string/actionDesc_actionList" />
+
+        <com.forrestguice.suntimeswidget.settings.ActionButtonPreference
+            android:key="app_ui_notetapaction"
+            android:title="@string/settings_action_onNoteTap"
+            android:dialogTitle="@string/settings_action_onNoteTap"
+            android:summary="%s" android:widgetLayout="@layout/layout_pref_action"
+            android:entries="@array/actions_noteTapActions_display" android:entryValues="@array/actions_noteTapActions_values"
+            android:defaultValue="@string/def_app_ui_notetapaction"
+            app:actionButtonContentDescription="@string/actionDesc_actionList" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+</PreferenceScreen>

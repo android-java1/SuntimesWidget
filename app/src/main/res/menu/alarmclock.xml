@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+    <group android:checkableBehavior="none">
+
+        <item android:id="@+id/action_bedtime"
+            android:icon="?attr/icActionBedtime"
+            android:title="@string/bedtime_label"
+            app:showAsAction="ifRoom"
+            android:orderInCategory="10" />
+
+        <item android:id="@+id/action_settings"
+            android:icon="?attr/icActionSettings"
+            android:title="@string/action_settings"
+            app:showAsAction="never"
+            android:visible="false"
+            android:orderInCategory="997" />
+
+        <!--<item android:id="@+id/action_help"
+            android:icon="?attr/icActionHelp"
+            android:title="@string/configAction_help"
+            app:showAsAction="never"
+             android:orderInCategory="998" />-->
+
+        <item android:id="@+id/action_about"
+            android:icon="?attr/icActionAbout"
+            android:title="@string/action_about"
+            app:showAsAction="never"
+            android:visible="false"
+            android:orderInCategory="999" />
+
+    </group>
+</menu>

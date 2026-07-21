@@ -1,0 +1,1489 @@
+/**
+    Copyright (C) 2018-2024 Forrest Guice
+    This file is part of SuntimesWidget.
+
+    SuntimesWidget is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuntimesWidget is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with SuntimesWidget.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package com.forrestguice.suntimeswidget.moon;
+
+import android.annotation.SuppressLint;
+import android.app.Dialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.res.TypedArray;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.style.ImageSpan;
+
+import android.util.Log;
+import android.view.ContextThemeWrapper;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
+import android.widget.TextView;
+
+import com.forrestguice.annotation.NonNull;
+import com.forrestguice.annotation.Nullable;
+
+import com.forrestguice.colors.Color;
+import com.forrestguice.colors.ColorValues;
+
+import com.forrestguice.suntimeswidget.calculator.settings.LengthUnit;
+import com.forrestguice.suntimeswidget.calculator.settings.TimeFormatMode;
+import com.forrestguice.suntimeswidget.calculator.settings.display.AndroidResID_TimeDeltaDisplay;
+import com.forrestguice.suntimeswidget.calculator.settings.display.LengthUnitDisplay;
+import com.forrestguice.suntimeswidget.calculator.settings.display.AndroidResID_SolarEvents;
+import com.forrestguice.suntimeswidget.calculator.settings.display.TimeDateDisplay;
+import com.forrestguice.suntimeswidget.calculator.settings.display.TimeDeltaDisplay;
+import com.forrestguice.suntimeswidget.views.SpanUtils;
+import com.forrestguice.support.widget.BottomSheetDialogBase;
+import com.forrestguice.suntimeswidget.HelpDialog;
+import com.forrestguice.suntimeswidget.MenuAddon;
+import com.forrestguice.suntimeswidget.R;
+import com.forrestguice.suntimeswidget.SuntimesUtils;
+import com.forrestguice.suntimeswidget.timepicker.TimeDialog;
+import com.forrestguice.suntimeswidget.alarmclock.AlarmSettings;
+import com.forrestguice.suntimeswidget.calculator.SuntimesMoonData;
+import com.forrestguice.suntimeswidget.calculator.SuntimesMoonData0;
+import com.forrestguice.suntimeswidget.calculator.SuntimesMoonData1;
+import com.forrestguice.suntimeswidget.calculator.core.SuntimesCalculator;
+import com.forrestguice.suntimeswidget.colors.AppColorValues;
+import com.forrestguice.suntimeswidget.colors.AppColorValuesCollection;
+import com.forrestguice.suntimeswidget.colors.ColorValuesSheetDialog;
+import com.forrestguice.suntimeswidget.map.WorldMapWidgetSettings.MapSpeed;
+import com.forrestguice.suntimeswidget.moon.colors.MoonApsisColorValues;
+import com.forrestguice.suntimeswidget.moon.colors.MoonPhasesColorValues;
+import com.forrestguice.suntimeswidget.moon.colors.MoonRiseSetColorValues;
+import com.forrestguice.suntimeswidget.settings.AppSettings;
+import com.forrestguice.suntimeswidget.calculator.settings.SolarEvents;
+import com.forrestguice.suntimeswidget.settings.WidgetSettings;
+import com.forrestguice.suntimeswidget.themes.SuntimesTheme;
+import com.forrestguice.support.widget.PopupMenuCompat;
+import com.forrestguice.suntimeswidget.views.ShareUtils;
+import com.forrestguice.suntimeswidget.views.TooltipCompat;
+import com.forrestguice.suntimeswidget.views.ViewUtils;
+
+import com.forrestguice.support.content.ContextCompat;
+import com.forrestguice.support.widget.ImageViewCompat;
+
+import com.forrestguice.support.widget.RecyclerView;
+import com.forrestguice.util.android.AndroidResources;
+import com.forrestguice.util.text.TimeDisplayText;
+import com.forrestguice.util.Pair;
+
+import java.util.Calendar;
+import java.util.List;
+import java.util.TimeZone;
+
+import static android.content.Context.LAYOUT_INFLATER_SERVICE;
+
+public class MoonDialog extends BottomSheetDialogBase
+{
+    public static final String ARG_DATETIME = "datetime";
+    public static final String ARG_PLAYING = "playing";
+    public static final String ARG_PLAY_OFFSET = "offsetMinutes";
+
+    public static final String DIALOGTAG_COLORS = "moon_colors";
+    public static final String DIALOGTAG_TIME = "moon_time";
+
+    public static final String DIALOGTAG_HELP = "moon_help";
+    public static final int HELP_PATH_ID = R.string.help_moon_path;
+
+    public static final String MAPTAG_MOON = "_moon";
+
+    private static final TimeDateDisplay utils = new TimeDateDisplay();
+    private static final TimeDeltaDisplay delta_utils = new TimeDeltaDisplay();
+
+    public MoonDialog()
+    {
+        Bundle args = new Bundle();
+        args.putLong(ARG_DATETIME, -1);
+        args.putBoolean(ARG_PLAYING, false);
+        args.putInt(ARG_PLAY_OFFSET, 0);
+        setArguments(args);
+    }
+
+    @Nullable
+    private SuntimesMoonData data;
+    public void setData( @Nullable SuntimesMoonData data )
+    {
+        Context context = getContext();
+        if (context != null && data != null && !data.isCalculated() && data.isImplemented()) {
+            data.calculate(context);
+        }
+        this.data = data;
+    }
+
+    public void showPositionAt(@Nullable Long datetime) {
+        showPositionAt(datetime, true);
+    }
+    public void showPositionAt(@Nullable Long datetime, boolean updateViews)
+    {
+        getArgs().putLong(ARG_DATETIME, (datetime == null ? -1 : datetime));
+        if (isAdded() && updateViews) {
+            updateViews();
+        }
+    }
+    protected long arg_dateTime() {
+        return getArgs().getLong(ARG_DATETIME, -1);
+    }
+
+    private TextView text_dialogTitle;
+    private TextView text_dialogTime, text_dialogTimeOffset;
+    private MoonRiseSetView1 moonriseset;
+    private MoonPhaseView1 currentphase;
+    private MoonPhasesView1 moonphases;
+    private MoonApsisView moonapsis;
+    private TextView moondistance, moondistance_label, moondistance_note;
+    private ImageButton playButton, pauseButton, nextButton, prevButton, resetButton, menuButton;
+    private View mediaAnchor = null;
+
+    private int timeColor, warningColor, accentColor, normalColor, pressedColor, disabledColor;
+    //private int riseColor, setColor;
+
+    @NonNull @Override
+    public Dialog onCreateDialog(Bundle savedInstanceState)
+    {
+        Dialog dialog = super.onCreateDialog(savedInstanceState);
+        dialog.setOnShowListener(onShowListener);
+        return dialog;
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup parent, @Nullable Bundle savedState)
+    {
+        Context context = requireContext();
+        initLocale(context);
+        ContextThemeWrapper contextWrapper = new ContextThemeWrapper(requireActivity(), AppSettings.loadTheme(context));    // hack: contextWrapper required because base theme is not properly applied
+        View dialogContent = inflater.cloneInContext(contextWrapper).inflate(R.layout.layout_dialog_moon, parent, false);
+        initViews(context, dialogContent);
+        themeViews(context);
+        return dialogContent;
+    }
+
+    public void initLocale(Context context)
+    {
+        AndroidResources res = AndroidResources.wrap(context);
+        TimeDeltaDisplay.initDisplayStrings(res, new AndroidResID_TimeDeltaDisplay());
+        SuntimesUtils.initDisplayStrings(context);
+        SolarEvents.initDisplayStrings(res, new AndroidResID_SolarEvents());
+    }
+
+    @Override
+    public void onResume()
+    {
+        super.onResume();
+        expandSheet(getDialog());
+
+        Context context = requireContext();
+        ColorValuesSheetDialog colorDialog = (ColorValuesSheetDialog) getChildFragmentManager().findFragmentByTag(DIALOGTAG_COLORS);
+        if (colorDialog != null)
+        {
+            boolean isNightMode = getResources().getBoolean(R.bool.is_nightmode);
+            colorDialog.setAppWidgetID((isNightMode ? 1 : 0));
+            colorDialog.setColorTag(AppColorValues.TAG_APPCOLORS);
+            colorDialog.setColorCollection(new AppColorValuesCollection<>(context));
+            colorDialog.setDialogListener(colorDialogListener);
+        }
+
+        TimeDialog timeDialog = (TimeDialog) getChildFragmentManager().findFragmentByTag(DIALOGTAG_TIME);
+        if (timeDialog != null) {
+            timeDialog.setOnAcceptedListener(onSeekTimeDialogAccepted(timeDialog));
+        }
+
+        HelpDialog helpDialog = (HelpDialog) getChildFragmentManager().findFragmentByTag(DIALOGTAG_HELP);
+        if (helpDialog != null) {
+            helpDialog.setNeutralButtonListener(HelpDialog.getOnlineHelpClickListener(context, HELP_PATH_ID), DIALOGTAG_HELP);
+        }
+    }
+
+    protected int getPeekViewId() {
+        return R.id.divider1;
+    }
+
+    private final Runnable initPeekHeight = new Runnable() {
+        @Override
+        public void run() {
+            BottomSheetDialogBase.initPeekHeight(getDialog(), getPeekViewId());
+        }
+    };
+
+    private final DialogInterface.OnShowListener onShowListener = new DialogInterface.OnShowListener()
+    {
+        @Override
+        public void onShow(final DialogInterface dialog)
+        {
+            Context context = getContext();
+            if (context != null)
+            {
+                updateViews();
+                text_dialogTitle.post(initPeekHeight);
+
+                if (AppSettings.isTelevision(context)) {
+                    menuButton.requestFocus();
+                }
+            }
+            startUpdateTask();
+        }
+    };
+
+    public void initViews(Context context, View dialogView)
+    {
+        text_dialogTitle = (TextView) dialogView.findViewById(R.id.moondialog_title);
+
+        text_dialogTime = (TextView) dialogView.findViewById(R.id.info_time_moon);
+        text_dialogTimeOffset = (TextView) dialogView.findViewById(R.id.info_time_offset);
+
+        moonriseset = (MoonRiseSetView1) dialogView.findViewById(R.id.moonriseset_view);
+        currentphase = (MoonPhaseView1) dialogView.findViewById(R.id.moonphase_view);
+        moonphases = (MoonPhasesView1) dialogView.findViewById(R.id.moonphases_view);
+        moonapsis = (MoonApsisView) dialogView.findViewById(R.id.moonapsis_view);
+
+        moondistance = (TextView) dialogView.findViewById(R.id.moonapsis_current_distance);
+        moondistance_label = (TextView) dialogView.findViewById(R.id.moonapsis_current_label);
+        moondistance_note = (TextView) dialogView.findViewById(R.id.moonapsis_current_note);
+        moondistance_note.setVisibility(View.GONE);
+
+        playButton = (ImageButton) dialogView.findViewById(R.id.media_play);
+        if (playButton != null) {
+            playButton.setOnClickListener(onPlayClicked);
+        }
+        pauseButton = (ImageButton) dialogView.findViewById(R.id.media_pause);
+        if (pauseButton != null) {
+            pauseButton.setOnClickListener(onPauseClicked);
+        }
+        nextButton = (ImageButton) dialogView.findViewById(R.id.media_next);
+        if (nextButton != null) {
+            TooltipCompat.setTooltipText(nextButton, nextButton.getContentDescription());
+            nextButton.setOnClickListener(onNextClicked);
+        }
+        prevButton = (ImageButton) dialogView.findViewById(R.id.media_prev);
+        if (prevButton != null) {
+            TooltipCompat.setTooltipText(prevButton, prevButton.getContentDescription());
+            prevButton.setOnClickListener(onPrevClicked);
+        }
+        resetButton = (ImageButton) dialogView.findViewById(R.id.media_reset);
+        if (resetButton != null)
+        {
+            TooltipCompat.setTooltipText(resetButton, resetButton.getContentDescription());
+            resetButton.setEnabled(false);
+            resetButton.setOnClickListener(onResetClicked);
+        }
+
+        mediaAnchor = dialogView.findViewById(R.id.dialogTopRightAnchor);
+
+        menuButton = (ImageButton) dialogView.findViewById(R.id.menu_button);
+        if (menuButton != null)
+        {
+            TooltipCompat.setTooltipText(menuButton, menuButton.getContentDescription());
+            menuButton.setOnClickListener(onMenuClicked);
+            if (AppSettings.isTelevision(context)) {
+                menuButton.setFocusableInTouchMode(true);
+            }
+        }
+
+        if (context != null) {
+            currentphase.adjustColumnWidth(context.getResources().getDimensionPixelSize(R.dimen.moonphase_column0_width));
+        }
+        attachListeners();
+    }
+
+    protected void attachListeners()
+    {
+        moonriseset.setViewListener(moonriseset_listener);
+        text_dialogTimeOffset.setOnClickListener(currentphase_onClickListener);
+        currentphase.setOnClickListener(currentphase_onClickListener);
+        currentphase.setOnLongClickListener(currentphase_onLongClickListener);
+        moonphases.setViewListener(moonphases_listener);
+        moonapsis.setViewListener(moonapsis_listener);
+    }
+    protected void detachListeners()
+    {
+        moonriseset.setViewListener(null);
+        text_dialogTimeOffset.setOnClickListener(null);
+        currentphase.setOnClickListener(null);
+        currentphase.setOnLongClickListener(null);
+        moonphases.setViewListener(null);
+        moonapsis.setViewListener(null);
+    }
+
+    @SuppressLint("ResourceType")
+    public void themeViews(Context context)
+    {
+        AppColorValues values = AppColorValuesCollection.initSelectedColors(context);
+        if (values != null) {
+            currentphase.setColors(context, values);
+            moonriseset.setColors(context, values);
+            moonapsis.setColors(context, values);
+            moonphases.setColors(context, values);
+        }
+
+        if (themeOverride != null)
+        {
+            int titleColor = themeOverride.getTitleColor();
+            timeColor = normalColor = themeOverride.getTimeColor();
+            int textColor = themeOverride.getTextColor();
+            //riseColor = themeOverride.getMoonriseTextColor();
+            //setColor = themeOverride.getMoonsetTextColor();
+            pressedColor = accentColor = themeOverride.getAccentColor();
+            warningColor = themeOverride.getActionColor();
+            float timeSizeSp = themeOverride.getTimeSizeSp();
+            float textSizeSp = themeOverride.getTextSizeSp();
+
+            text_dialogTitle.setTextColor(titleColor);
+            text_dialogTitle.setTextSize(themeOverride.getTitleSizeSp());
+            text_dialogTitle.setTypeface(text_dialogTitle.getTypeface(), (themeOverride.getTitleBold() ? Typeface.BOLD : Typeface.NORMAL));
+
+            text_dialogTime.setTextColor(titleColor);
+            text_dialogTime.setTextSize(timeSizeSp);
+
+            text_dialogTimeOffset.setTextColor(textColor);
+            text_dialogTimeOffset.setTextSize(textSizeSp);
+
+            //noinspection deprecation
+            moonriseset.themeViews(context, themeOverride);
+            //noinspection deprecation
+            currentphase.themeViews(context, themeOverride);
+            //noinspection deprecation
+            moonphases.themeViews(context, themeOverride);
+            //noinspection deprecation
+            moonapsis.themeViews(context, themeOverride);
+
+            moondistance_label.setTextColor(titleColor);
+            moondistance_label.setTextSize(themeOverride.getTitleSizeSp());
+
+            moondistance.setTextColor(textColor);
+            moondistance.setTextSize(themeOverride.getTimeSuffixSizeSp());
+
+            moondistance_note.setTextColor(timeColor);
+            moondistance_note.setTextSize(textSizeSp);
+
+        } else {
+            int[] colorAttrs = { android.R.attr.textColorPrimary, R.attr.tagColor_warning, R.attr.buttonPressColor, R.attr.text_disabledColor, R.attr.text_accentColor };
+            TypedArray typedArray = context.obtainStyledAttributes(colorAttrs);
+            timeColor = normalColor = ContextCompat.getColor(context, typedArray.getResourceId(0, R.color.grey_50));
+            warningColor = ContextCompat.getColor(context, typedArray.getResourceId(1, R.color.warningTag));
+            pressedColor = ContextCompat.getColor(context, typedArray.getResourceId(2, R.color.btn_tint_pressed));
+            disabledColor = ContextCompat.getColor(context, typedArray.getResourceId(3, timeColor));
+            accentColor = ContextCompat.getColor(context, typedArray.getResourceId(4, R.color.text_accent));
+            typedArray.recycle();
+        }
+
+        if (resetButton != null) {
+            ImageViewCompat.setImageTintList(resetButton, SuntimesUtils.colorStateList(warningColor, disabledColor, pressedColor));
+        }
+    }
+
+    private SuntimesTheme themeOverride = null;
+    @SuppressWarnings("deprecation")
+    @Deprecated
+    public void themeViews(Context context, SuntimesTheme theme)
+    {
+        if (theme != null) {
+            themeOverride = theme;
+            if (moonriseset != null) {
+                moonriseset.themeViews(context, theme);
+            }
+            if (moonphases != null) {
+                moonphases.themeViews(context, theme);
+            }
+            if (moonapsis != null) {
+                moonapsis.themeViews(context, theme);
+            }
+        }
+    }
+
+    public void updateViews() {
+        updateViews(true);
+    }
+    public void updateViews(boolean scrollViews)
+    {
+        stopUpdateTask();
+        Calendar dateTime = getDialogCalendar();
+        updateTimeText();
+
+        Context context = getContext();
+        if (context != null)
+        {
+            moonriseset.updateViews(context);
+            currentphase.updateViews(context, data, dateTime);
+            moonphases.updateViews(context);
+            moonapsis.updateViews(context);
+            updateMoonApsis(context, dateTime);
+        }
+
+        if (resetButton != null) {
+            boolean resetIsPossible = isOffset(arg_dateTime() != -1 ? arg_dateTime() : getNow());
+            resetButton.setEnabled(resetIsPossible);
+            resetButton.setVisibility(resetIsPossible ? View.VISIBLE : View.GONE);
+        }
+        if (playButton != null) {
+            playButton.setVisibility(isPlaying() ? View.GONE : View.VISIBLE);
+        }
+        if (pauseButton != null) {
+            pauseButton.setVisibility(isPlaying() ? View.VISIBLE : View.GONE);
+        }
+
+        final long datetime = arg_dateTime();
+        if (datetime != -1 && scrollViews)
+        {
+            moonriseset.scrollToDate(datetime);
+            moonphases.scrollToDate(datetime);
+            moonapsis.scrollToDate(datetime);
+        }
+        startUpdateTask();
+    }
+
+    protected void updateTimeText()
+    {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+
+        long nowMillis = getNow();
+        Calendar now = Calendar.getInstance();
+        now.setTimeInMillis(getNow());
+
+        long dialogTimeMillis = getDialogTime();
+
+        TimeZone tz = (data != null ? data.timezone() : TimeZone.getDefault());
+        Calendar dialogTime = Calendar.getInstance(tz);
+        dialogTime.setTimeInMillis(dialogTimeMillis);
+        boolean nowIsAfter = now.after(dialogTime);
+
+        String suffix = "";
+        if (isOffset(nowMillis, dialogTimeMillis)) {
+            suffix = ((nowIsAfter) ? context.getString(R.string.cardlabel_past_today) : context.getString(R.string.cardlabel_future_today));
+        }
+
+        String timeText = utils.calendarDateTimeDisplayString(AndroidResources.wrap(context), dialogTime).toString();
+        if (text_dialogTime != null)
+        {
+            CharSequence timeDisplay = (suffix.isEmpty()) ? timeText : SpanUtils.createBoldColorSpan(null, getString(R.string.datetime_format_verylong, timeText, suffix), suffix, warningColor);
+            if (inDST(dialogTime.getTimeZone(), dialogTime))
+            {
+                int iconSize = (int) getResources().getDimension(R.dimen.statusIcon_size);
+                SpanUtils.ImageSpanTag[] spanTags = {
+                        new SpanUtils.ImageSpanTag(SpanUtils.SPANTAG_DST, SpanUtils.createDstSpan(context, iconSize))
+                };
+                CharSequence dstIcon = SpanUtils.createSpan(context, " " + SpanUtils.SPANTAG_DST, spanTags);
+                timeDisplay = TextUtils.concat(timeDisplay, dstIcon);
+            }
+            text_dialogTime.setText(timeDisplay);
+        }
+
+        if (text_dialogTimeOffset != null) {
+            if (!suffix.isEmpty())
+            {
+                TimeDisplayText offsetText = delta_utils.timeDeltaLongDisplayString(nowMillis, dialogTimeMillis, false, true, false);
+                offsetText.setSuffix("");
+                String displayString = context.getString((nowIsAfter ? R.string.delta_ago : R.string.delta_hence), offsetText.toString());
+                text_dialogTimeOffset.setText(SpanUtils.createBoldColorSpan(null, displayString, offsetText.toString(), warningColor));
+            } else text_dialogTimeOffset.setText(" ");
+        }
+    }
+
+    protected static boolean useDST(TimeZone timezone) {
+        return (Build.VERSION.SDK_INT < 24 ? timezone.useDaylightTime() : timezone.observesDaylightTime());
+    }
+    public static boolean inDST(TimeZone timezone, Calendar calendar) {
+        return useDST(timezone) && timezone.inDaylightTime(calendar.getTime());
+    }
+
+    protected long getNow() {
+        return System.currentTimeMillis();
+    }
+    protected long getDialogTime()
+    {
+        long offsetMillis = getOffsetMinutes() * 60 * 1000L;
+        return (arg_dateTime() != -1 ? arg_dateTime() : getNow()) + offsetMillis;
+    }
+    protected Calendar getDialogCalendar() {
+        Calendar c = Calendar.getInstance(data != null ? data.timezone() : TimeZone.getDefault());
+        c.setTimeInMillis(getDialogTime());
+        return c;
+    }
+
+    protected  boolean isOffset(long nowMillis) {
+        return isOffset(nowMillis, getDialogTime());
+    }
+    protected boolean isOffset(long nowMillis, long eventMillis) {
+        return Math.abs(nowMillis - eventMillis) > 60 * 1000;
+    }
+
+    private void updateMoonApsis(@Nullable Context context, Calendar dateTime)
+    {
+        if (context != null && data != null && data.isCalculated())
+        {
+            LengthUnit units = WidgetSettings.loadLengthUnitsPref(context, 0);
+
+            SuntimesCalculator calculator = data.calculator();
+            SuntimesCalculator.MoonPosition position = (calculator != null ? calculator.getMoonPosition(dateTime) : null);
+            if (position != null)
+            {
+                ColorValues colors = moonapsis.getColors();
+                int risingColor = (colors != null ? colors.getColor(MoonApsisColorValues.COLOR_MOON_APOGEE_TEXT) : Color.BLACK);
+                int settingColor = (colors != null ? colors.getColor(MoonApsisColorValues.COLOR_MOON_PERIGEE_TEXT) : Color.BLACK);
+                TimeDisplayText distance = LengthUnitDisplay.formatAsDistance(AndroidResources.wrap(context), position.distance, units, 2, true);
+                moondistance.setText(SpanUtils.createColorSpan(null, LengthUnitDisplay.formatAsDistance(AndroidResources.wrap(context), distance), distance.getValue(), (moonapsis.isRising() ? risingColor : settingColor)));
+
+                if (SuntimesMoonData.isSuperMoon(position))
+                    moondistance_note.setText(context.getString(R.string.timeMode_moon_super));
+                else if (SuntimesMoonData.isMicroMoon(position))
+                    moondistance_note.setText(context.getString(R.string.timeMode_moon_micro));
+                else moondistance_note.setText("");
+
+                moondistance.setVisibility(View.VISIBLE);
+
+            } else moondistance.setVisibility(View.GONE);
+        } else {
+            moondistance.setVisibility(View.GONE);
+            moondistance_note.setVisibility(View.GONE);
+        }
+    }
+
+    protected void scrollAllToMoonRiseSet(int position)
+    {
+        setData(moonriseset.getData(position));
+        boolean isCentered = (position >= MoonRiseSetView1.MoonRiseSetAdapter.CENTER_POSITION && position < MoonRiseSetView1.MoonRiseSetAdapter.CENTER_POSITION + moonriseset.getItemsPerDay());
+        if (isCentered)
+        {
+            showPositionAt(null, false);  // set position without triggering normal update..
+            updateViews(false);                     // to avoid infinite-scroll (scrolling moonriseset may trigger this method)
+            moonphases.scrollToCenter();
+            moonapsis.scrollToCenter();
+
+        } else {
+            if (data != null)
+            {
+                boolean scrollForward = (data.calendar().getTimeInMillis() >= getNow());
+                long datetime = data.nowThen(data.calendar()).getTimeInMillis() + ((60 * 1000) * (scrollForward ? 1 : -1));   // plus or minus a minute to round off the display value
+                showPositionAt(datetime, false);     // set position without triggering normal update..
+                updateViews(false);                   // to avoid infinite-scroll (scrolling moonriseset may trigger this method)
+                moonphases.scrollToDate(datetime);
+                moonapsis.scrollToDate(datetime);
+            }
+        }
+    }
+
+    private final MoonRiseSetView1.MoonRiseSetViewListener moonriseset_listener = new MoonRiseSetView1.MoonRiseSetViewListener()
+    {
+        @Override
+        public void onScrollStateChanged(RecyclerView recyclerView, int newState, int position) {
+            if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                scrollAllToMoonRiseSet(position);
+            }
+        }
+
+        @Override
+        public void onResetClick(View v) {
+        }
+
+        @Override
+        public void onClick(View v, MoonRiseSetView1.MoonRiseSetAdapter adapter, int position, String eventID) {
+            if (getContext() != null) {
+                showContextMenu(getContext(), v, adapter, position, eventID);
+            }
+        }
+    };
+
+    private final MoonPhasesView1.MoonPhasesViewListener moonphases_listener = new MoonPhasesView1.MoonPhasesViewListener() {
+        @Override
+        public void onClick(View v, MoonPhasesView1.PhaseAdapter adapter, int position, SuntimesCalculator.MoonPhase phase) {
+            if (getContext() != null) {
+                showContextMenu(getContext(), v, adapter, position, phase);
+            }
+        }
+    };
+
+    private final MoonApsisView.MoonApsisViewListener moonapsis_listener = new MoonApsisView.MoonApsisViewListener() {
+        @Override
+        public void onClick(View v, MoonApsisView.MoonApsisAdapter adapter, int position, boolean isRising) {
+            if (getContext() != null) {
+                showContextMenu(getContext(), v, adapter, position, isRising);
+            }
+        }
+    };
+
+    private final View.OnClickListener currentphase_onClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            //showMediaMenu(getContext(), v);
+            Context context = getContext();
+            if (context != null) {
+                showMediaPopup(context, text_dialogTimeOffset);
+            }
+        }
+    };
+    private final View.OnLongClickListener currentphase_onLongClickListener = new View.OnLongClickListener() {
+        @Override
+        public boolean onLongClick(View v) {
+            togglePlay();
+            return true;
+        }
+    };
+
+    private final View.OnClickListener onPlayClicked = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            playMap();
+        }
+    };
+    private final View.OnClickListener onPauseClicked = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            stopMap(false);
+        }
+    };
+    private final View.OnClickListener onNextClicked = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            setOffsetMinutes(getOffsetMinutes() + MapSpeed.FIVE_MINUTES.getStepMinutes());
+        }
+    };
+    private final View.OnClickListener onPrevClicked = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            setOffsetMinutes(getOffsetMinutes() - MapSpeed.FIVE_MINUTES.getStepMinutes());
+        }
+    };
+    private final View.OnClickListener onResetClicked = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            stopMap(true);
+        }
+    };
+    private final View.OnClickListener onSearchClicked = new View.OnClickListener()
+    {
+        @Override
+        public void onClick(View v) {
+            if (getContext() != null) {
+                showSeekTimeDialog(getContext());
+            }
+        }
+    };
+
+    protected void showSeekTimeDialog(Context context)
+    {
+        TimeDialog dialog = new TimeDialog();
+        dialog.setTimeIs24(WidgetSettings.loadTimeFormatModePref(context, 0) == TimeFormatMode.MODE_24HR);
+        dialog.setOnAcceptedListener(onSeekTimeDialogAccepted(dialog));
+        dialog.setInitialTime("12", "0");    // TODO: from prefs
+        dialog.setDialogTitle(context.getString(R.string.action_seekTime));
+        dialog.show(getChildFragmentManager(), DIALOGTAG_TIME);
+    }
+
+    private DialogInterface.OnClickListener onSeekTimeDialogAccepted(final TimeDialog dialog) {
+        return new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface d, int which)
+            {
+                if (getContext() != null) {
+                    int hour = dialog.getSelectedHour();
+                    int minute = dialog.getSelectedMinute();    // TODO: to prefs
+                    //seekDateTime(getContext(), hour, minute, getDialogCalendar());
+                    seekDateTime(getContext(), hour, minute, Calendar.getInstance());
+                }
+            }
+        };
+    }
+
+    protected void seekDateTime(@Nullable Context context, int hour, int minute, Calendar now)
+    {
+        Calendar c = Calendar.getInstance(now.getTimeZone());
+        c.setTimeInMillis(now.getTimeInMillis());
+        c.set(Calendar.HOUR_OF_DAY, hour);
+        c.set(Calendar.MINUTE, minute);
+
+        long offsetMinutes = (c.getTimeInMillis() - now.getTimeInMillis()) / (60 * 1000);
+        setOffsetMinutes((int) offsetMinutes);
+        //showPositionAt(calendar.getTimeInMillis(), true);
+    }
+
+    public void centerDialog()
+    {
+        setData(moonriseset.getDataAtCenter());
+        showPositionAt(null);
+        moonriseset.scrollToCenter();   // onScrollChanged triggers rest of reset sequence
+        //moonphases.scrollToCenter();
+        //moonapsis.scrollToCenter();
+    }
+
+    protected void toggleShowPhaseDate(Context context)
+    {
+        boolean value = AppSettings.loadShowMoonPhaseDatePref(context);
+        AppSettings.saveShowMoonPhaseDatePref(context, !value);
+        moonphases.notifyDataSetChanged();
+    }
+
+    protected void toggleLunarNoon(Context context)
+    {
+        boolean value = AppSettings.loadShowLunarNoonPref(context);
+        AppSettings.saveShowLunarNoonPref(context, !value);
+        moonriseset.setShowLunarNoon(!value);
+    }
+
+    private final View.OnClickListener onMenuClicked = new ViewUtils.ThrottledClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (getContext() != null) {
+                showOverflowMenu(getContext(), v);
+            }
+        }
+    });
+
+    /**
+     * Overflow Menu
+     */
+    protected boolean showOverflowMenu(final Context context, View view)
+    {
+        PopupMenuCompat.createMenu(context, view, R.menu.moonmenu, onOverflowMenuClick).show();
+        return true;
+    }
+    private void updateOverflowMenu(Context context, Menu menu)
+    {
+        MenuItem lunarNoonItem = menu.findItem(R.id.action_lunarnoon_show);
+        if (lunarNoonItem != null) {
+            lunarNoonItem.setChecked(AppSettings.loadShowLunarNoonPref(context));
+        }
+
+        MenuItem phaseDateItem = menu.findItem(R.id.action_phase_showdate);
+        if (phaseDateItem != null) {
+            phaseDateItem.setChecked(AppSettings.loadShowMoonPhaseDatePref(context));
+        }
+
+        MenuItem columnItem;
+        switch (moonphases.numColumns())
+        {
+            case 2: columnItem = menu.findItem(R.id.action_phase_columns_2); break;
+            case 3: columnItem = menu.findItem(R.id.action_phase_columns_3); break;
+            case 4: default: columnItem = menu.findItem(R.id.action_phase_columns_4); break;
+        }
+        if (columnItem != null) {
+            columnItem.setChecked(true);
+        }
+    }
+    private final PopupMenuCompat.PopupMenuListener onOverflowMenuClick = new ViewUtils.ThrottledPopupMenuListener(new PopupMenuCompat.PopupMenuListener()
+    {
+        @Override
+        public void onUpdateMenu(Context context, Menu menu) {
+            updateOverflowMenu(context, menu);
+        }
+
+        @Override
+        public boolean onMenuItemClick(MenuItem item)
+        {
+            Context context = getContext();
+            if (context == null) {
+                Log.w("MoonDialog", "onMenuItemClick: null context!");
+                return false;
+            }
+
+            int itemId = item.getItemId();
+            if (itemId == R.id.action_colors) {
+                showColorDialog(context);
+                return true;
+
+            } else if (itemId == R.id.action_phase_showdate) {
+                toggleShowPhaseDate(context);
+                return true;
+
+            } else if (itemId == R.id.action_phase_columns_2) {
+                saveMoonPhaseColumns(context, 2);
+                return true;
+
+            } else if (itemId == R.id.action_phase_columns_3) {
+                saveMoonPhaseColumns(context, 3);
+                return true;
+
+            } else if (itemId == R.id.action_phase_columns_4) {
+                saveMoonPhaseColumns(context, 4);
+                return true;
+
+            } else if (itemId == R.id.action_show_controls) {
+                showMediaPopup(context, text_dialogTimeOffset);
+                return true;
+
+            } else if (itemId == R.id.action_lunarnoon_show) {
+                toggleLunarNoon(context);
+                return true;
+
+            } else if (itemId == R.id.action_help) {
+                showHelp(context);
+                return true;
+            }
+            return false;
+        }
+    });
+
+    protected void saveMoonPhaseColumns(@NonNull Context context, int numColumns)
+    {
+        AppSettings.saveMoonPhaseColumnsPref(context, numColumns);
+        moonphases.setNumColumns(numColumns);
+        moonphases.onSizeChanged(moonphases.getWidth(), moonphases.getHeight(), moonphases.getWidth(), moonphases.getHeight());
+    }
+
+    /**
+     * MediaMenu
+     */
+    protected boolean showMediaMenu(final Context context, View view)
+    {
+        PopupMenuCompat.createMenu(context, view, R.menu.moonmenu_media, onMediaMenuClick).show();
+        return true;
+    }
+    private void updateMediaMenu(Context context, Menu menu)
+    {
+        MenuItem playItem = menu.findItem(R.id.action_play);
+        if (playItem != null) {
+            playItem.setVisible( !isPlaying() );
+        }
+        MenuItem pauseItem = menu.findItem(R.id.action_pause);
+        if (pauseItem != null) {
+            pauseItem.setVisible( isPlaying() );
+        }
+        MenuItem resetItem = menu.findItem(R.id.action_reset);
+        if (resetItem != null) {
+            resetItem.setEnabled(isOffset(arg_dateTime() != -1 ? arg_dateTime() : getNow()));
+        }
+    }
+    private final PopupMenuCompat.PopupMenuListener onMediaMenuClick = new PopupMenuCompat.PopupMenuListener()
+    {
+        @Override
+        public void onUpdateMenu(Context context, Menu menu) {
+            updateMediaMenu(context, menu);
+        }
+
+        @Override
+        public boolean onMenuItemClick(MenuItem item)
+        {
+            int itemId = item.getItemId();
+            if (itemId == R.id.action_play) {
+                playMap();
+                return true;
+
+            } else if (itemId == R.id.action_pause) {
+                stopMap(false);
+                return true;
+
+            } else if (itemId == R.id.action_reset) {
+                stopMap(true);
+                return true;
+            }
+            return false;
+        }
+    };
+
+    /**
+     * MediaPopup
+     */
+    protected void showMediaPopup(@NonNull final Context context, @NonNull View v)
+    {
+        LayoutInflater inflater = (LayoutInflater) context.getSystemService(LAYOUT_INFLATER_SERVICE);
+        if (inflater != null)
+        {
+            PopupWindow popupWindow = new PopupWindow(createMediaPopupView(context), LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, true);
+            popupWindow.setBackgroundDrawable(new ColorDrawable(ContextCompat.getColor(context, android.R.color.transparent)));
+            popupWindow.setOutsideTouchable(true);
+
+            //int gravity = (Gravity.TOP | Gravity.START);
+            //popupWindow.showAsDropDown((isCollapsed() ? v : text_dialogTitle), SuntimesUtils.dpToPixels(context, -8), SuntimesUtils.dpToPixels(context, 8), gravity);
+            popupWindow.showAsDropDown(isCollapsed() && menuButton != null ? menuButton : text_dialogTimeOffset);
+            //popupWindow.showAsDropDown(mediaAnchor != null ? mediaAnchor : text_dialogTimeOffset);
+            popupWindow.showAsDropDown(menuButton);
+        }
+    }
+
+    @Nullable
+    protected View createMediaPopupView(@NonNull final Context context)
+    {
+        LayoutInflater inflater = (LayoutInflater) context.getSystemService(LAYOUT_INFLATER_SERVICE);
+        if (inflater != null)
+        {
+            @SuppressLint("InflateParams")
+            final View popupView = inflater.inflate(R.layout.layout_popup_mediacontrol, null);
+            if (popupView != null)
+            {
+                ImageButton resetButton = (ImageButton) popupView.findViewById(R.id.media_reset);
+                if (resetButton != null) {
+                    resetButton.setOnClickListener(createMediaPopupListener(popupView, onResetClicked));
+                    TooltipCompat.setTooltipText(resetButton, resetButton.getContentDescription());
+                    ImageViewCompat.setImageTintList(resetButton, SuntimesUtils.colorStateList(warningColor, disabledColor, pressedColor));
+                }
+                ImageButton playButton = (ImageButton) popupView.findViewById(R.id.media_play);
+                if (playButton != null) {
+                    playButton.setOnClickListener(createMediaPopupListener(popupView, onPlayClicked));
+                    ImageViewCompat.setImageTintList(playButton, SuntimesUtils.colorStateList(normalColor, disabledColor, pressedColor));
+                }
+                ImageButton pauseButton = (ImageButton) popupView.findViewById(R.id.media_pause);
+                if (pauseButton != null) {
+                    pauseButton.setOnClickListener(createMediaPopupListener(popupView, onPauseClicked));
+                    ImageViewCompat.setImageTintList(pauseButton, SuntimesUtils.colorStateList(accentColor, disabledColor, pressedColor));
+                }
+                ImageButton nextButton = (ImageButton) popupView.findViewById(R.id.media_next);
+                if (nextButton != null) {
+                    nextButton.setOnClickListener(createMediaPopupListener(popupView, onNextClicked));
+                    TooltipCompat.setTooltipText(nextButton, nextButton.getContentDescription());
+                    ImageViewCompat.setImageTintList(nextButton, SuntimesUtils.colorStateList(normalColor, disabledColor, pressedColor));
+                }
+                ImageButton prevButton = (ImageButton) popupView.findViewById(R.id.media_prev);
+                if (prevButton != null) {
+                    prevButton.setOnClickListener(createMediaPopupListener(popupView, onPrevClicked));
+                    TooltipCompat.setTooltipText(prevButton, prevButton.getContentDescription());
+                    ImageViewCompat.setImageTintList(prevButton, SuntimesUtils.colorStateList(normalColor, disabledColor, pressedColor));
+                }
+
+                ImageButton searchButton = (ImageButton) popupView.findViewById(R.id.media_search);
+                if (searchButton != null) {
+                    searchButton.setOnClickListener(createMediaPopupListener(popupView, onSearchClicked));
+                    TooltipCompat.setTooltipText(searchButton, searchButton.getContentDescription());
+                    ImageViewCompat.setImageTintList(searchButton, SuntimesUtils.colorStateList(normalColor, disabledColor, pressedColor));
+                }
+            }
+            updateMediaPopupView(popupView);
+            return popupView;
+        }
+        return null;
+    }
+    private View.OnClickListener createMediaPopupListener(final View popupView, final View.OnClickListener listener) {
+        return new View.OnClickListener() {
+            @Override
+            public void onClick(final View v) {
+                listener.onClick(v);
+                updateMediaPopupView(popupView);
+            }
+        };
+    }
+    protected void updateMediaPopupView(@Nullable View popupView)
+    {
+        if (popupView != null)
+        {
+            boolean isPlaying = isPlaying();
+            ImageButton resetButton = (ImageButton) popupView.findViewById(R.id.media_reset);
+            if (resetButton != null) {
+                resetButton.setEnabled(isOffset(arg_dateTime() != -1 ? arg_dateTime() : getNow()));
+            }
+            ImageButton playButton = (ImageButton) popupView.findViewById(R.id.media_play);
+            if (playButton != null) {
+                //playButton.setVisibility(isPlaying ? View.GONE : View.VISIBLE);
+                playButton.setVisibility(View.GONE);  // TODO: implement play update loop
+            }
+            ImageButton pauseButton = (ImageButton) popupView.findViewById(R.id.media_pause);
+            if (pauseButton != null) {
+                //pauseButton.setVisibility(isPlaying ? View.VISIBLE : View.GONE);
+                pauseButton.setVisibility(View.GONE);  // TODO: implement play update loop
+            }
+        }
+    }
+
+    /**
+     * ContextMenu
+     */
+    protected boolean showContextMenu(final Context context, View view, MoonRiseSetView1.MoonRiseSetAdapter adapter, int position, String eventID)
+    {
+        SuntimesMoonData data = adapter.initData(context, position);
+        if (eventID != null)
+        {
+            Calendar date = MoonRiseSetView1.MoonRiseSetEvent.getCalendarForEvent(data, eventID);
+            if (date != null)
+            {
+                PopupMenuCompat.createMenu(context, view, R.menu.moonriseset_context, onContextMenuClick_riseSet(eventID, date)).show();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected boolean showContextMenu(final Context context, View view, MoonPhasesView1.PhaseAdapter adapter, int position, SuntimesCalculator.MoonPhase phase)
+    {
+        SuntimesMoonData1 data = adapter.initData(context, position);
+        if (data != null)
+        {
+            Calendar date = data.moonPhaseCalendar(phase);
+            if (date != null)
+            {
+                PopupMenuCompat.createMenu(context, view, R.menu.moonphase_context, onContextMenuClick_phase(phase, date)).show();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected boolean showContextMenu(final Context context, View view, MoonApsisView.MoonApsisAdapter adapter, int position, boolean isRising)
+    {
+        SuntimesMoonData0 data = adapter.initData(context, position);
+        Pair<Calendar, SuntimesCalculator.MoonPosition> event = isRising ? data.getMoonApogee() : data.getMoonPerigee();
+
+        if (event != null && event.first != null)
+        {
+            PopupMenuCompat.createMenu(context, view, R.menu.moonapsis_context, onContextMenuClick_apsis(event)).show();
+            return true;
+        }
+        return false;
+    }
+
+    private void updateContextMenu(Context context, Menu menu, final long datetime) {
+        updateContextMenu(context, menu, (String) null, datetime);
+    }
+
+    private void updateContextMenu(Context context, Menu menu, @Nullable SolarEvents event, final long datetime) {
+        updateContextMenu(context, menu, (event != null ? event.name() : null), datetime);
+    }
+
+    private void updateContextMenu(Context context, Menu menu, @Nullable String eventID, final long datetime)
+    {
+        Intent data = new Intent();
+        data.putExtra(MenuAddon.EXTRA_SHOW_DATE, datetime);
+        if (eventID != null) {
+            data.putExtra("event", eventID);
+        }
+        updateContextMenu(context, menu, data);
+    }
+
+    private void updateContextMenu(Context context, Menu m, Intent data)
+    {
+        setDataToMenu(m, data);
+
+        MenuItem alarmItem = m.findItem(R.id.action_alarm);
+        if (alarmItem != null) {
+            alarmItem.setVisible(AlarmSettings.hasAlarmSupport(context));
+        }
+
+        MenuItem addonSubmenuItem = m.findItem(R.id.addonSubMenu);
+        if (addonSubmenuItem != null) {
+            List<MenuAddon.ActivityItemInfo> addonMenuItems = MenuAddon.queryAddonMenuItems(context);
+            if (!addonMenuItems.isEmpty()) {
+                PopupMenuCompat.forceActionBarIcons(addonSubmenuItem.getSubMenu());
+                long datetime = data.getLongExtra(MenuAddon.EXTRA_SHOW_DATE, 0);
+                MenuAddon.populateSubMenu(addonSubmenuItem, addonMenuItems, datetime);
+            }
+        }
+    }
+
+    private static void setDataToMenu(Menu m, Intent data)
+    {
+        if (m != null) {
+            for (int i = 0; i < m.size(); i++) {
+                m.getItem(i).setIntent(data);
+                setDataToMenu(m.getItem(i).getSubMenu(), data);
+            }
+        }
+    }
+
+    private PopupMenuCompat.PopupMenuListener onContextMenuClick_riseSet(final String eventID, final Calendar date)
+    {
+        return new ViewUtils.ThrottledPopupMenuListener(new MoonContextMenuListener()
+        {
+            @Override
+            public void onUpdateMenu(Context context, Menu menu) {
+                updateContextMenu(context, menu, eventID, date.getTimeInMillis());
+                moonriseset.lockScrolling();   // prevent the popupmenu from nudging the view
+            }
+
+            @Override
+            public void onDismiss() {
+                moonriseset.post(new Runnable() {
+                    @Override
+                    public void run() {                      // a submenu may be shown after the popup is dismissed
+                        moonriseset.unlockScrolling();           // so defer unlockScrolling until after it is shown
+                    }
+                });
+            }
+        });
+    }
+
+    private PopupMenuCompat.PopupMenuListener onContextMenuClick_phase(final SuntimesCalculator.MoonPhase phase, final Calendar date)
+    {
+        return new ViewUtils.ThrottledPopupMenuListener(new MoonContextMenuListener()
+        {
+            @Override
+            public void onUpdateMenu(Context context, Menu menu) {
+                updateContextMenu(context, menu, SolarEvents.valueOf(phase), date.getTimeInMillis());
+                moonphases.lockScrolling();   // prevent the popupmenu from nudging the view
+            }
+
+            @Override
+            public void onDismiss() {
+                moonapsis.post(new Runnable() {
+                    @Override
+                    public void run() {                      // a submenu may be shown after the popup is dismissed
+                        moonphases.unlockScrolling();           // so defer unlockScrolling until after it is shown
+                    }
+                });
+            }
+        });
+    }
+
+    private PopupMenuCompat.PopupMenuListener onContextMenuClick_apsis(final Pair<Calendar, SuntimesCalculator.MoonPosition> event)
+    {
+        return new ViewUtils.ThrottledPopupMenuListener(new MoonContextMenuListener()
+        {
+            @Override
+            public void onUpdateMenu(Context context, Menu menu) {
+                if (event != null && event.first != null) {
+                    updateContextMenu(context, menu, event.first.getTimeInMillis());
+                    moonapsis.lockScrolling();   // prevent the popupmenu from nudging the view
+                }
+            }
+
+            @Override
+            public void onDismiss() {
+                moonapsis.post(new Runnable() {
+                    @Override
+                    public void run() {                      // a submenu may be shown after the popup is dismissed
+                        moonapsis.unlockScrolling();           // so defer unlockScrolling until after it is shown
+                    }
+                });
+            }
+        });
+    }
+
+    protected abstract class MoonContextMenuListener extends PopupMenuCompat.PopupMenuListener
+    {
+        @Override
+        public abstract void onDismiss();
+
+        @Override
+        public boolean hasOnDismissListener() {
+            return true;
+        }
+
+        @Override
+        public abstract void onUpdateMenu(Context context, Menu menu);
+
+        @Override
+        public boolean onMenuItemClick(MenuItem item)
+        {
+            Context context = getContext();
+            if (context == null) {
+                return false;
+            }
+
+            Intent itemData = item.getIntent();
+            long itemTime = ((itemData != null) ? itemData.getLongExtra(MenuAddon.EXTRA_SHOW_DATE, -1L) : -1L);
+
+            int itemId = item.getItemId();
+            if (itemId == R.id.action_alarm) {
+                if (dialogListener != null) {
+                    SolarEvents event = (itemData != null && itemData.hasExtra("event") ? SolarEvents.valueOf(itemData.getStringExtra("event")) : null);
+                    dialogListener.onSetAlarm(event);
+                    collapseSheet(getDialog());
+                }
+                return true;
+
+            } else if (itemId == R.id.action_sunposition) {
+                if (dialogListener != null) {
+                    dialogListener.onShowPosition(itemTime);
+                    collapseSheet(getDialog());
+                }
+                return true;
+
+            } else if (itemId == R.id.action_moon) {
+                //moonriseset.setViewListener(null);
+                showPositionAt(itemTime);
+                //moonriseset.setViewListener(moonriseset_listener);
+                return true;
+
+            } else if (itemId == R.id.action_worldmap) {
+                if (dialogListener != null) {
+                    dialogListener.onShowMap(itemTime);
+                    collapseSheet(getDialog());
+                }
+                return true;
+
+            } else if (itemId == R.id.action_date) {
+                if (dialogListener != null) {
+                    dialogListener.onShowDate(itemTime);
+                }
+                collapseSheet(getDialog());
+                return true;
+
+            } else if (itemId == R.id.action_calendar) {
+                openCalendar(context, itemTime);
+                return true;
+
+            } else if (itemId == R.id.action_share) {
+                shareItem(context, itemData);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    protected void openCalendar(Context context, long itemMillis)
+    {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(Uri.parse("content://com.android.calendar/time/" + itemMillis));
+        context.startActivity(intent);
+    }
+
+    protected void shareItem(Context context, @Nullable Intent itemData)
+    {
+        String eventID = (itemData != null && itemData.hasExtra("event") ? itemData.getStringExtra("event") : null);
+        long itemMillis = itemData != null ? itemData.getLongExtra(MenuAddon.EXTRA_SHOW_DATE, -1L) : -1L;
+        if (itemMillis != -1L) {
+            String displayString = (eventID != null ? SolarEvents.valueOf(eventID).getLongDisplayString() : null);
+            boolean showSeconds = WidgetSettings.loadShowSecondsPref(context, 0);
+            boolean showTime = WidgetSettings.loadShowTimeDatePref(context, 0);
+            ShareUtils.shareItem(context, displayString, itemMillis, showTime, showSeconds);
+        }
+    }
+
+    @SuppressLint("ResourceType")
+    protected void showHelp(Context context)
+    {
+        int iconSize = (int) getResources().getDimension(R.dimen.helpIcon_size);
+        int[] iconAttrs = { R.attr.moonriseColor, R.attr.moonsetColor, R.attr.moonnoonIcon, R.attr.moonnightIcon, R.attr.icActionShare,
+                R.attr.tagColor_dst, R.attr.icActionDst };
+        TypedArray typedArray = context.obtainStyledAttributes(iconAttrs);
+        int moonriseColor = ContextCompat.getColor(context, typedArray.getResourceId(0, R.color.moonIcon_color_rising_dark));
+        int moonsetColor = ContextCompat.getColor(context, typedArray.getResourceId(1, R.color.moonIcon_color_setting_dark));
+        ImageSpan risingIcon = SpanUtils.createImageSpan(context, R.drawable.svg_sunrise, iconSize, iconSize, moonriseColor);
+        ImageSpan settingIcon = SpanUtils.createImageSpan(context, R.drawable.svg_sunset, iconSize, iconSize, moonsetColor);
+        ImageSpan noonIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(2, R.drawable.ic_moon_noon), iconSize, iconSize/2, moonriseColor);
+        ImageSpan midnightIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(3, R.drawable.ic_moon_night), iconSize, iconSize/2, moonsetColor);
+        ImageSpan shareIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(4, R.drawable.ic_action_share), iconSize, iconSize, 0, null);
+        int dstColor = ContextCompat.getColor(context, typedArray.getResourceId(5, R.color.dstTag_dark));
+        ImageSpan dstIcon = SpanUtils.createImageSpan(context, typedArray.getResourceId(6, R.drawable.ic_weather_sunny), iconSize, iconSize, dstColor);
+        typedArray.recycle();
+
+        SpanUtils.ImageSpanTag[] helpTags = {
+                new SpanUtils.ImageSpanTag("[Icon Rising]", risingIcon),
+                new SpanUtils.ImageSpanTag("[Icon Setting]", settingIcon),
+                new SpanUtils.ImageSpanTag("[Icon Noon]", noonIcon),
+                new SpanUtils.ImageSpanTag("[Icon Midnight]", midnightIcon),
+                new SpanUtils.ImageSpanTag("[Icon Share]", shareIcon),
+                new SpanUtils.ImageSpanTag("[Icon DST]", dstIcon),
+        };
+        SpannableStringBuilder helpSpan0 = SpanUtils.createSpan(context, getString(R.string.help_general_moondialog), helpTags);
+        SpannableStringBuilder helpSpan1 = SpanUtils.createSpan(context, SpanUtils.fromHtml(getString(R.string.help_general_dst)), helpTags);
+        CharSequence helpDisplay = TextUtils.concat(helpSpan0, "\n\n", helpSpan1);
+
+        HelpDialog helpDialog = new HelpDialog();
+        helpDialog.setContent(helpDisplay);
+        helpDialog.setShowNeutralButton(getString(R.string.action_onlineHelp));
+        helpDialog.setNeutralButtonListener(HelpDialog.getOnlineHelpClickListener(context, HELP_PATH_ID), DIALOGTAG_HELP);
+        helpDialog.show(getChildFragmentManager(), DIALOGTAG_HELP);
+    }
+
+    /*@Override
+    public void onSaveInstanceState( Bundle outState )
+    {
+        super.onSaveInstanceState(outState);
+        //moonriseset.saveState(outState);
+        //currentphase.saveState(outState);
+        //moonphases.saveState(outState);
+    }*/
+
+    protected void updateMediaButtons()
+    {
+        boolean isPlaying = isPlaying();
+        if (playButton != null && pauseButton != null) {
+            pauseButton.setVisibility(isPlaying ? View.VISIBLE : View.GONE);
+            playButton.setVisibility(isPlaying ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    public boolean isPlaying() {
+        return getArgs().getBoolean(ARG_PLAYING);
+    }
+    public int getOffsetMinutes() {
+        return getArgs().getInt(ARG_PLAY_OFFSET);
+    }
+    public void setOffsetMinutes(int value) {
+        getArgs().putInt(ARG_PLAY_OFFSET, value);
+        updateViews();
+    }
+
+    public void playMap()
+    {
+        stopUpdateTask();
+        getArgs().putBoolean(ARG_PLAYING, true);
+        updateMediaButtons();
+        startUpdateTask();    // TODO: 'play' update task
+    }
+
+    public void togglePlay()
+    {
+        if (isPlaying()) {
+            stopMap(false);
+        } else {
+            playMap();
+        }
+    }
+
+    public void stopMap(boolean reset)
+    {
+        stopUpdateTask();
+        getArgs().putBoolean(ARG_PLAYING, false);
+        if (reset) {
+            getArgs().putInt(ARG_PLAY_OFFSET, 0);
+        }
+        updateMediaButtons();
+        updateViews(false);
+        startUpdateTask();
+    }
+
+    private void startUpdateTask()
+    {
+        stopUpdateTask();
+        if (currentphase != null)
+        {
+            updateTask0_isRunning = true;
+            currentphase.post(updateTask0);
+
+            updateTask1_isRunning = true;
+            currentphase.post(updateTask1);
+        }
+    }
+
+    private void stopUpdateTask()
+    {
+        if (currentphase != null)
+        {
+            updateTask0_isRunning = false;
+            currentphase.removeCallbacks(updateTask0);
+
+            updateTask1_isRunning = false;
+            currentphase.removeCallbacks(updateTask1);
+        }
+    }
+
+    public static final int UPDATE_RATE0 = 3 * 1000;       // 3sec
+    private final Runnable updateTask0 = new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            if (data != null && currentphase != null)
+            {
+                updateTimeText();
+                currentphase.updatePosition(getDialogCalendar());
+                if (updateTask0_isRunning) {
+                    currentphase.postDelayed(this, UPDATE_RATE0);
+                }
+            }
+        }
+    };
+    private boolean updateTask0_isRunning = false;
+
+    public static final int UPDATE_RATE1 = 5 * 60 * 1000;  // 5min
+    private final Runnable updateTask1 = new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            if (getContext() != null && data != null && currentphase != null)
+            {
+                currentphase.updateIllumination(getContext(), getDialogCalendar());
+                if (updateTask1_isRunning) {
+                    currentphase.postDelayed(this, UPDATE_RATE1);
+                }
+            }
+        }
+    };
+    private boolean updateTask1_isRunning = false;
+
+    @Override
+    public void onStop()
+    {
+        stopUpdateTask();
+        super.onStop();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public void showColorDialog(Context context)
+    {
+        boolean isNightMode = context.getResources().getBoolean(R.bool.is_nightmode);
+        ColorValuesSheetDialog dialog = new ColorValuesSheetDialog();
+        dialog.setAppWidgetID((isNightMode ? 1 : 0));
+        dialog.setColorTag(AppColorValues.TAG_APPCOLORS);
+        dialog.setColorCollection(new AppColorValuesCollection<>(context));
+        dialog.setDialogListener(colorDialogListener);
+        dialog.setFilter(new MoonRiseSetColorValues().getColorKeys(),
+                         new MoonPhasesColorValues().getColorKeys(),
+                         new MoonApsisColorValues().getColorKeys());
+        dialog.show(getChildFragmentManager(), DIALOGTAG_COLORS);
+    }
+
+    private final ColorValuesSheetDialog.DialogListener colorDialogListener = new ColorValuesSheetDialog.DialogListener()
+    {
+        @Override
+        public void onColorValuesSelected(@Nullable ColorValues values)
+        {
+            Context context = getContext();
+            if (context != null)
+            {
+                currentphase.setColors(context, values);
+                moonriseset.setColors(context, values);
+                moonapsis.setColors(context, values);
+                moonphases.setColors(context, values);
+
+                if (dialogListener != null) {
+                    dialogListener.onColorsModified(values);
+                }
+            }
+        }
+
+        public void requestPeekHeight(int height) {}
+        public void requestHideSheet() {}
+        public void requestExpandSheet() {}
+        public void onModeChanged(int mode) {}
+
+        @Nullable
+        @Override
+        public ColorValues getDefaultValues() {
+            return (getContext() != null ? new AppColorValues(AndroidResources.wrap(getContext()), true) : null);
+        }
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private MoonDialogListener dialogListener = null;
+    public void setDialogListener( MoonDialogListener listener ) {
+        dialogListener = listener;
+    }
+
+    /**
+     * DialogListener
+     */
+    public static class MoonDialogListener
+    {
+        public void onSetAlarm( @Nullable SolarEvents suggestedEvent ) {}
+        public void onShowMap( long suggestedDate ) {}
+        public void onShowPosition( long suggestedDate ) {}
+        public void onShowDate( long suggestedDate ) {}
+        public void onColorsModified(@Nullable ColorValues values) {}
+    }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.forrestguice.support.preference.PreferenceCategory
+        android:title="@string/calendars_pref_title">
+
+        <com.forrestguice.support.preference.Preference
+            android:key="appwidget_0_calendars_readme" android:persistent="false"
+            android:title="@string/calendars_pref_summary"
+            android:summary="@string/help_calendar" />
+
+    </com.forrestguice.support.preference.PreferenceCategory>
+
+</PreferenceScreen>
