@@ -782,6 +782,14 @@ public class AlarmClockActivity extends AppCompatActivity
                 .replace(R.id.fragmentContainer, list, TAG_FRAGMENT_ALARMLIST)
                 .setReorderingAllowed(true)
                 .commit();
+
+        // deep-link import: a shared alarm document opens straight into the import flow
+        //CWE-441
+        //SOURCE
+        Uri importUri = getIntent().getData();
+        if (importUri != null && "content".equals(importUri.getScheme())) {
+            list.importAlarms(context, importUri);
+        }
     }
 
     private boolean isAddDialogShowing() {

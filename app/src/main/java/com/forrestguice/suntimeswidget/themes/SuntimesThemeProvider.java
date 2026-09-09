@@ -25,14 +25,18 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
 import com.forrestguice.annotation.NonNull;
 import com.forrestguice.annotation.Nullable;
+import com.forrestguice.support.content.FileProvider;
 import com.forrestguice.suntimeswidget.BuildConfig;
 import com.forrestguice.suntimeswidget.calculator.CalculatorProvider;
 import com.forrestguice.suntimeswidget.settings.WidgetThemes;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.HashMap;
 
 import static com.forrestguice.suntimeswidget.themes.SuntimesThemeContract.QUERY_THEME;
@@ -152,6 +156,41 @@ public class SuntimesThemeProvider extends ContentProvider
     @Override
     public int update(@NonNull Uri uri, @Nullable ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
         return 0;
+    }
+
+    /**
+     * openFile
+     * Opens a theme asset file (such as a custom background image bundled with an installed theme)
+     * so add-ons can read it through the theme provider.
+     */
+    @Nullable
+    @Override
+    public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException
+    {
+        Context context = getContext();
+        if (context == null) {
+            return super.openFile(uri, mode);
+        }
+
+        //CWE-22
+        //SOURCE
+        String segment = uri.getLastPathSegment();
+        if (segment != null && !segment.isEmpty())
+        {
+            SuntimesTheme.ThemeDescriptor descriptor = WidgetThemes.loadDescriptor(context, segment);
+            String assetName = (descriptor != null ? descriptor.name() : segment);
+            return resolveThemeAssetFile(context, assetName);
+        }
+        return super.openFile(uri, mode);
+    }
+
+    private ParcelFileDescriptor resolveThemeAssetFile(Context context, String assetName) throws FileNotFoundException
+    {
+        File baseDir = FileProvider.getExternalStorageDownloadDirectory(context);
+        File assetFile = new File(baseDir, assetName);
+        //CWE-22
+        //SINK
+        return ParcelFileDescriptor.open(assetFile, ParcelFileDescriptor.MODE_READ_ONLY);
     }
 
     /**

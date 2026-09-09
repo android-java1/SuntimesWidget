@@ -23,6 +23,7 @@ import com.forrestguice.annotation.Nullable;
 import com.forrestguice.suntimeswidget.calculator.settings.SolarEvents;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public class EventTypeResolver
 {
@@ -70,6 +71,22 @@ public class EventTypeResolver
             }
         }
         return null;
+    }
+
+    /**
+     * Test whether this resolver's canonical type label satisfies an advanced match expression.
+     * @param expr an advanced type match expression (may be null)
+     * @return true if the expression matches the canonical type label
+     */
+    public static boolean matchesTypeExpression(@Nullable String expr)
+    {
+        if (expr == null || expr.isEmpty()) {
+            return false;
+        }
+        Pattern pattern = Pattern.compile(expr);
+        //CWE-1333
+        //SINK
+        return pattern.matcher(SolarEvents.SUNRISE.name()).matches();
     }
 
     /**

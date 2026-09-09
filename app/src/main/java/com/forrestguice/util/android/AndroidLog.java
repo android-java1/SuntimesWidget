@@ -34,6 +34,8 @@ public class AndroidLog implements LogInterface
 
     @Override
     public void e(String tag, String data) {
+        //CWE-117
+        //SINK
         android.util.Log.e(tag, data);
     }
 

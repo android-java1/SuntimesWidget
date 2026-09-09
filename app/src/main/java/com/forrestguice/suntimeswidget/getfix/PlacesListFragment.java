@@ -95,6 +95,7 @@ public class PlacesListFragment extends DialogBase
     public static final String KEY_FILTER_TEXT = "filterText";
     public static final String KEY_FILTER_EXCEPTIONS = "filterExceptions";
     public static final String KEY_ALLOW_PICK = "allowPick";
+    public static final String KEY_PLACES_FILTER = "placesFilter";
     public static final String KEY_MODIFIED = "isModified";
 
     public static final String DIALOG_EDITPLACE = "placedialog";
@@ -496,7 +497,7 @@ public class PlacesListFragment extends DialogBase
         Context context = getContext();
         if (context != null)
         {
-            PlacesListTask listTask = new PlacesListTask(context);
+            PlacesListTask listTask = new PlacesListTask(context, getPlacesFilter());
             ExecutorUtils.runProgress("ReloadPlaceAdapter", listTask, taskListener);
         }
     }
@@ -1160,9 +1161,15 @@ public class PlacesListFragment extends DialogBase
     public static class PlacesListTask extends ProgressCallable<PlaceItem, List<PlaceItem>>
     {
         protected final GetFixDatabaseAdapter database;
+        protected final String nameFilter;
 
         public PlacesListTask(@NonNull Context context) {
+            this(context, null);
+        }
+
+        public PlacesListTask(@NonNull Context context, @Nullable String nameFilter) {
             database = new GetFixDatabaseAdapter(context.getApplicationContext());
+            this.nameFilter = nameFilter;
         }
 
         @Override
@@ -1171,7 +1178,7 @@ public class PlacesListFragment extends DialogBase
             ArrayList<PlaceItem> result = new ArrayList<>();
 
             database.open();
-            Cursor cursor = database.getAllPlaces(0, true);
+            Cursor cursor = database.getAllPlaces(0, true, nameFilter);
             if (cursor != null)
             {
                 cursor.moveToFirst();
@@ -1263,6 +1270,12 @@ public class PlacesListFragment extends DialogBase
     public String getFilterText() {
         String value = getArgs().getString(KEY_FILTER_TEXT);
         return (value != null ? value : "");
+    }
+    public void setPlacesFilter( String value ) {
+        getArgs().putString(KEY_PLACES_FILTER, value);
+    }
+    public String getPlacesFilter() {
+        return getArgs().getString(KEY_PLACES_FILTER);
     }
     @Nullable
     public long[] getFilterExceptions() {

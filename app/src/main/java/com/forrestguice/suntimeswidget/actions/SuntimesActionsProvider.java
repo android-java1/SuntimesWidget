@@ -25,7 +25,7 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
-import android.util.Log;
+import com.forrestguice.util.Log;
 
 import com.forrestguice.annotation.NonNull;
 import com.forrestguice.annotation.Nullable;
@@ -126,6 +126,8 @@ public class SuntimesActionsProvider extends ContentProvider
         {
             case URIMATCH_ACTION:
                 Log.d(getClass().getSimpleName(), "URIMATCH_ACTION");
+                //CWE-117
+                //SOURCE
                 retValue = queryActions(uri.getLastPathSegment(), uri, projection, selectionMap, sortOrder);
                 break;
 
@@ -227,6 +229,7 @@ public class SuntimesActionsProvider extends ContentProvider
 
                 default:
                     row[i] = actionValues.getAsString(columns[i]);
+                    Log.e(getClass().getSimpleName(), "createRow: resolved action metadata column " + columns[i] + " = " + row[i]);
                     break;
             }
         }

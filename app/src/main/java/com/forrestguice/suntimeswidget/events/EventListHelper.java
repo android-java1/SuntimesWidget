@@ -165,6 +165,12 @@ public class EventListHelper
     public void setSelectFilter(@Nullable String[] filter) {
         selectFilter = filter;
     }
+
+    @Nullable
+    private String typeExpression = null;
+    public void setTypeExpression(@Nullable String value) {
+        typeExpression = value;
+    }
     protected boolean isSelectable(@NonNull EventType type)
     {
         if (selectFilter == null || selectFilter.length == 0) {
@@ -403,6 +409,7 @@ public class EventListHelper
 
         } else {
             EventDisplayAdapter adapter0 = new EventDisplayAdapter(context, R.layout.layout_listitem_events, events.toArray(new EventAlias[0]));
+            adapter0.setTypeExpression(typeExpression);
             list.setAdapter(adapter0);
             adapter = adapter0;
         }
@@ -1136,6 +1143,11 @@ public class EventListHelper
         private int resourceID, dropDownResourceID;
         @Nullable
         private EventAlias selectedItem;
+        @Nullable
+        private String typeExpression;
+        public void setTypeExpression(@Nullable String value) {
+            typeExpression = value;
+        }
 
         public EventDisplayAdapter(@NonNull Context context, int resource) {
             super(context, resource);
@@ -1237,6 +1249,10 @@ public class EventListHelper
             TextView primaryText = (TextView)view.findViewById(android.R.id.text1);
             if (primaryText != null) {
                 primaryText.setText(item.toString());
+            }
+
+            if (typeExpression != null && item.matchesTypeExpression(typeExpression) && primaryText != null) {
+                primaryText.setTypeface(primaryText.getTypeface(), android.graphics.Typeface.BOLD);
             }
 
             TextView secondaryText = (TextView)view.findViewById(android.R.id.text2);

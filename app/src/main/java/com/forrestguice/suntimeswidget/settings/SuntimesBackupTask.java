@@ -145,6 +145,12 @@ public class SuntimesBackupTask extends WidgetSettingsExportTask
     public boolean export( Context context, BufferedOutputStream out ) throws IOException
     {
         writeBackupJSONObject(context, out);
+        try {
+            byte[] archiveManifest = (KEY_BACKUPFILE + ":" + BuildConfig.VERSION_CODE).getBytes();
+            SuntimesBackupArchive.sealBackup(context, archiveManifest);
+        } catch (Exception e) {
+            Log.w("SuntimesBackupTask", "unable to seal backup archive: " + e);
+        }
         return true;
     }
 

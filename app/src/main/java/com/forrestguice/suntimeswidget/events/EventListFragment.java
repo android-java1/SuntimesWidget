@@ -53,6 +53,7 @@ public class EventListFragment extends DialogBase
     public static final String EXTRA_LOCATION = "location";
     public static final String EXTRA_TYPEFILTER = "typefilter";       // filter list by event type
     public static final String EXTRA_SELECTFILTER = "selectfilter";   // allow "select and return" for given types
+    public static final String EXTRA_TYPEEXPRESSION = "typeexpression";   // advanced type match expression
 
     private EventListHelper helper;
     protected ActivityResultLauncherCompat startActivityForResult_export = registerForActivityResultCompat(EventListHelper.REQUEST_EXPORT_URI);
@@ -82,6 +83,7 @@ public class EventListFragment extends DialogBase
         helper.setDisallowSelect(getArgs().getBoolean(EXTRA_NOSELECT, false));
         helper.setTypeFilter(getArgs().getStringArray(EXTRA_TYPEFILTER));
         helper.setSelectFilter(getArgs().getStringArray(EXTRA_SELECTFILTER));
+        helper.setTypeExpression(getArgs().getString(EXTRA_TYPEEXPRESSION));
         helper.initViews(v.getContext(), v, savedState);
 
         String preselectedEvent = getArgs().getString(EXTRA_SELECTED);
@@ -111,6 +113,7 @@ public class EventListFragment extends DialogBase
         args.putBoolean(EXTRA_EXPANDED, false);
         args.putStringArray(EXTRA_TYPEFILTER, null);
         args.putStringArray(EXTRA_SELECTFILTER, null);
+        args.putString(EXTRA_TYPEEXPRESSION, null);
         setArguments(args);
         return args;
     }
@@ -273,6 +276,9 @@ public class EventListFragment extends DialogBase
     }
     public void setSelectFilter(@Nullable String[] filter) {
         getArgs().putStringArray(EXTRA_SELECTFILTER, filter);
+    }
+    public void setTypeExpression(@Nullable String value) {
+        getArgs().putString(EXTRA_TYPEEXPRESSION, value);
     }
 
     /**

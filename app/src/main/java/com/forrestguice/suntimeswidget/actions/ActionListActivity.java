@@ -80,6 +80,9 @@ public class ActionListActivity extends AppCompatActivity
 
         Intent intent = getIntent();
         preselectedAction = intent.getStringExtra(PARAM_SELECTED);
+        //CWE-470
+        //SOURCE
+        actionLaunchHandler = intent.getStringExtra(PARAM_ACTION_HANDLER);
 
         initData(this);
 
@@ -87,6 +90,7 @@ public class ActionListActivity extends AppCompatActivity
         helper.setData(data);
         helper.initViews(this, findViewById(android.R.id.content), icicle);
         helper.setDisallowSelect(intent.getBooleanExtra(PARAM_NOSELECT, false));
+        helper.setActionLaunchClass(actionLaunchHandler);
 
         Toolbar menuBar = (Toolbar) findViewById(R.id.app_menubar);
         setSupportActionBar(menuBar);
@@ -101,6 +105,10 @@ public class ActionListActivity extends AppCompatActivity
             helper.triggerActionMode();
         }
     }
+
+    public static final String PARAM_ACTION_HANDLER = "actionHandler";
+    @Nullable
+    private String actionLaunchHandler;
 
     private final View.OnClickListener onItemAccepted = new View.OnClickListener() {
         @Override

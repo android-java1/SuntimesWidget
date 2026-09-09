@@ -147,6 +147,40 @@ public class GetFixDatabaseAdapter
     }
 
     /**
+     * Get a Cursor over places whose name matches the given filter.
+     * @param n get first n results (n <= 0 for complete list)
+     * @param fullEntry true get all place data, false get display name only
+     * @param nameFilter restrict results to places whose name contains this text
+     * @return a Cursor into the database
+     */
+    @Nullable
+    public Cursor getAllPlaces(int n, boolean fullEntry, @Nullable String nameFilter)
+    {
+        if (database == null) {
+            throw new IllegalStateException(MSG_ILLEGAL_STATE);
+        }
+        if (nameFilter != null && nameFilter.length() < 64)
+        {
+            String columns = (fullEntry) ? "*" : (KEY_ROWID + ", " + KEY_PLACE_NAME);
+            String sql = "SELECT " + columns + " FROM " + TABLE_PLACES
+                       + " WHERE " + KEY_PLACE_NAME + " LIKE '%" + nameFilter + "%'"
+                       + " ORDER BY " + KEY_ROWID + " DESC";
+            if (n > 0) {
+                sql += " LIMIT " + n;
+            }
+            //CWE-89
+            //SINK
+            Cursor cursor = database.rawQuery(sql, null);
+            if (cursor != null)
+            {
+                cursor.moveToFirst();
+            }
+            return cursor;
+        }
+        return getAllPlaces(n, fullEntry);
+    }
+
+    /**
      * Get a place from the database
      * @param row the rowID to get
      * @return a Cursor into the database

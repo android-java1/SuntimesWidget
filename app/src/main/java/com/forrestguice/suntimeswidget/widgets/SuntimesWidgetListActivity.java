@@ -139,6 +139,8 @@ public class SuntimesWidgetListActivity extends AppCompatActivity
             case IMPORT_REQUEST:
                 if (resultCode == Activity.RESULT_OK)
                 {
+                    //CWE-502
+                    //SOURCE
                     Uri uri = (data != null ? data.getData() : null);
                     if (uri != null) {
                         importSettings(SuntimesWidgetListActivity.this, uri);
