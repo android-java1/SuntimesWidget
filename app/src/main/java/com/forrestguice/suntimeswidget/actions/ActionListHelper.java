@@ -119,6 +119,12 @@ public class ActionListHelper
         disallowSelect = value;
     }
 
+    @Nullable
+    private String actionLaunchClass = null;
+    public void setActionLaunchClass( @Nullable String className ) {
+        actionLaunchClass = className;
+    }
+
     public void setSelected( @Nullable String actionID ) {
         adapter.setSelected(selectedItem = adapter.findItemByID(actionID));
     }
@@ -354,6 +360,9 @@ public class ActionListHelper
                     saveDialog.getEdit().setData(data);
                     saveDialog.getEdit().loadIntent(context, 0, actionID);
                     saveDialog.setIntentID(actionID);
+                    if (actionLaunchClass != null) {
+                        saveDialog.getEdit().setIntentClass(actionLaunchClass);
+                    }
                 }
             });
 

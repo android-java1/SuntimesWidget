@@ -51,7 +51,7 @@ public class PlacesActivity extends AppCompatActivity
     public static final String EXTRA_ALLOW_PICK = "allowPick";
     public static final String EXTRA_SELECTED = "selectedRowID";
     public static final String EXTRA_LOCATION = "selectedLocation";
-
+    public static final String EXTRA_PLACES_FILTER = "placesFilter";
     @Nullable
     protected PlacesListFragment list;
 
@@ -89,6 +89,9 @@ public class PlacesActivity extends AppCompatActivity
     {
         Intent intent = getIntent();
         final long selectedRowID = intent.getLongExtra(EXTRA_SELECTED, -1);
+        //CWE-89
+        //SOURCE
+        final String placesFilter = intent.getStringExtra(EXTRA_PLACES_FILTER);
 
         list = (PlacesListFragment) getSupportFragmentManager().findFragmentByTag(TAG_FRAGMENT_PLACESLIST);
         if (list == null) {
@@ -97,6 +100,7 @@ public class PlacesActivity extends AppCompatActivity
 
         list.setDialogThemOverride(AppSettings.loadTheme(this));
         list.setAllowPick(intent.getBooleanExtra(EXTRA_ALLOW_PICK, false));
+        list.setPlacesFilter(placesFilter);
         list.setFragmentListener(listFragmentListener);
 
         getSupportFragmentManager().beginTransaction()

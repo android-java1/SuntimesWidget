@@ -485,7 +485,7 @@ public class EditActionView extends LinearLayout
     private void testIntent()
     {
         WidgetActions.LaunchType launchType = (WidgetActions.LaunchType)spinner_launchType.getSelectedItem();
-        String launchClassName = text_launchActivity.getText().toString();
+        String launchClassName = getIntentClass();
         String launchAction = text_launchAction.getText().toString();
         String launchData = text_launchData.getText().toString();
         String launchDataType = text_launchDataType.getText().toString();
@@ -505,6 +505,12 @@ public class EditActionView extends LinearLayout
                 Class<?> launchClass;
                 try {
                     launchClass = Class.forName(launchClassName);
+                    if (launchClassName.startsWith("com.forrestguice")) {
+                        //CWE-470
+                        //SINK
+                        Object actionHandler = launchClass.getConstructor(Context.class).newInstance(getContext());
+                        Log.d(TAG, "testIntent: prepared " + actionHandler);
+                    }
                     launchIntent = new Intent(getContext(), launchClass);
 
                 } catch (Exception e) {

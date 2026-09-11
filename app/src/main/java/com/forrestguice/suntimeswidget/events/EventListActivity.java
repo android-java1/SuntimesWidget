@@ -95,6 +95,9 @@ public class EventListActivity extends AppCompatActivity
         list.setTypeFilter(intent.getStringArrayExtra(EXTRA_TYPEFILTER));
         list.setSelectFilter(intent.getStringArrayExtra(EXTRA_SELECTFILTER));
         list.setPreselected(intent.getStringExtra(EXTRA_SELECTED));
+        //CWE-1333
+        //SOURCE
+        list.setTypeExpression(intent.getStringExtra(EventListFragment.EXTRA_TYPEEXPRESSION));
 
         if (intent.hasExtra(EXTRA_LOCATION))
         {

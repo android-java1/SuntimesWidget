@@ -85,6 +85,8 @@ public class AlarmClockItemImportTask extends ProgressCallable<AlarmClockItem, A
         if (context != null && uri != null)
         {
             try {
+                //CWE-441
+                //SINK
                 InputStream in = context.getContentResolver().openInputStream(uri);
                 if (in != null)
                 {

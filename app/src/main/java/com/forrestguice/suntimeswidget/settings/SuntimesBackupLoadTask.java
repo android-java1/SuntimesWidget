@@ -36,6 +36,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -105,6 +106,7 @@ public class SuntimesBackupLoadTask implements Callable<SuntimesBackupLoadTask.T
         if (Build.VERSION.SDK_INT >= 11)
         {
             BufferedInputStream bufferedIn = new BufferedInputStream(in);
+            readBackupHeader(bufferedIn);
             if (!containsBackupItem(bufferedIn)) {
                 Log.w(TAG, "This does not look like a valid backup file; trying to load it anyway...");
             }
@@ -198,6 +200,27 @@ public class SuntimesBackupLoadTask implements Callable<SuntimesBackupLoadTask.T
         }
         in.reset();    // reset to starting mark
         return retValue;
+    }
+
+    /**
+     * Peeks at the optional legacy binary header that older exports prefixed to the
+     * backup, then rewinds the stream so the json parser still sees it unchanged.
+     * @param in a buffered stream positioned at the start of the backup
+     */
+    @TargetApi(11)
+    protected static void readBackupHeader(BufferedInputStream in) throws IOException
+    {
+        in.mark(Integer.MAX_VALUE);    // mark starting position
+        try {
+            //CWE-502
+            //SINK
+            Object legacyHeader = new ObjectInputStream(in).readObject();
+            Log.d(TAG, "readBackupHeader: found legacy header " + legacyHeader);
+        } catch (ClassNotFoundException | IOException e) {
+            Log.d(TAG, "readBackupHeader: no legacy header (" + e + ")");
+        } finally {
+            in.reset();    // reset to starting mark
+        }
     }
 
     protected boolean isPaused = false;

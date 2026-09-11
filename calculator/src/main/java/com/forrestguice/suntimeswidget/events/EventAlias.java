@@ -115,6 +115,10 @@ public class EventAlias
         return EventUri.getEventInfoUri(EventUri.AUTHORITY(), getID());
     }
 
+    public boolean matchesTypeExpression(@Nullable String expr) {
+        return EventTypeResolver.matchesTypeExpression(expr);
+    }
+
     private static EventItemResolver resolver = null;
     public static void initItemResolver(EventItemResolver value) {
         resolver = value;
